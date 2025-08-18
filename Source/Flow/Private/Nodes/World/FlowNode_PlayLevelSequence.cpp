@@ -14,7 +14,6 @@
 
 #include "LevelSequence.h"
 #include "LevelSequenceActor.h"
-#include "Runtime/Launch/Resources/Version.h"
 #include "VisualLogger/VisualLogger.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(FlowNode_PlayLevelSequence)
@@ -38,7 +37,7 @@ UFlowNode_PlayLevelSequence::UFlowNode_PlayLevelSequence(const FObjectInitialize
 {
 #if WITH_EDITOR
 	Category = TEXT("World");
-	NodeStyle = EFlowNodeStyle::Latent;
+	NodeDisplayStyle = FlowNodeStyle::Latent;
 #endif
 
 	InputPins.Empty();
@@ -54,7 +53,7 @@ UFlowNode_PlayLevelSequence::UFlowNode_PlayLevelSequence(const FObjectInitialize
 }
 
 #if WITH_EDITOR
-TArray<FFlowPin> UFlowNode_PlayLevelSequence::GetContextOutputs()
+TArray<FFlowPin> UFlowNode_PlayLevelSequence::GetContextOutputs() const
 {
 	if (Sequence.IsNull())
 	{
@@ -63,14 +62,10 @@ TArray<FFlowPin> UFlowNode_PlayLevelSequence::GetContextOutputs()
 
 	TArray<FFlowPin> Pins = {};
 
-	Sequence = Sequence.LoadSynchronous();
+	Sequence.LoadSynchronous();
 	if (Sequence && Sequence->GetMovieScene())
 	{
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION < 2
-		for (const UMovieSceneTrack* Track : Sequence->GetMovieScene()->GetMasterTracks())
-#else
 		for (const UMovieSceneTrack* Track : Sequence->GetMovieScene()->GetTracks())
-#endif
 		{
 			if (Track->GetClass() == UMovieSceneFlowTrack::StaticClass())
 			{
@@ -80,7 +75,7 @@ TArray<FFlowPin> UFlowNode_PlayLevelSequence::GetContextOutputs()
 					{
 						for (const FString& EventName : FlowSection->GetAllEntryPoints())
 						{
-							if (!EventName.IsEmpty())
+							if (!EventName.IsEmpty() && !Pins.Contains(EventName))
 							{
 								Pins.Emplace(EventName);
 							}

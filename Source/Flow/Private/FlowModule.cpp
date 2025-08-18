@@ -4,6 +4,8 @@
 
 #include "Modules/ModuleManager.h"
 
+#define LOCTEXT_NAMESPACE "FFlowModule"
+
 void FFlowModule::StartupModule()
 {
 }
@@ -11,5 +13,5 @@ void FFlowModule::StartupModule()
 void FFlowModule::ShutdownModule()
 {
 }
-
+#undef LOCTEXT_NAMESPACE
 IMPLEMENT_MODULE(FFlowModule, Flow)

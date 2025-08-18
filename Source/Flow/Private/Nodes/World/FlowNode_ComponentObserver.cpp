@@ -1,7 +1,13 @@
 // Copyright https://github.com/MothCocoon/FlowGraph/graphs/contributors
 
 #include "Nodes/World/FlowNode_ComponentObserver.h"
+
 #include "FlowSubsystem.h"
+
+// #ARKREP_MODIFIED_CODE added include
+#if WITH_EDITOR
+#include "EngineUtils.h"
+#endif
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(FlowNode_ComponentObserver)
 
@@ -12,13 +18,102 @@ UFlowNode_ComponentObserver::UFlowNode_ComponentObserver(const FObjectInitialize
 	, SuccessCount(0)
 {
 #if WITH_EDITOR
-	NodeStyle = EFlowNodeStyle::Condition;
+	NodeDisplayStyle = FlowNodeStyle::Condition;
 	Category = TEXT("World");
 #endif
 
 	InputPins = {FFlowPin(TEXT("Start")), FFlowPin(TEXT("Stop"))};
 	OutputPins = {FFlowPin(TEXT("Success")), FFlowPin(TEXT("Completed")), FFlowPin(TEXT("Stopped"))};
 }
+
+// #ARKREP_MODIFIED_CODE : Added override to GetActorToFocus()
+#if WITH_EDITOR
+
+AActor* UFlowNode_ComponentObserver::GetActorToFocus()
+{
+	const TSet<AActor*> actors { GetActorsToFocus() };
+	if (!actors.IsEmpty())
+		return actors.Get(FSetElementId::FromInteger(0));
+
+	return Super::GetActorToFocus();
+}
+
+TSet<AActor*> UFlowNode_ComponentObserver::GetActorsToFocus()
+{
+	/** Find the actor in the world that has a flow component that match this node's IdentityTags */
+
+	if (!IdentityTags.IsValid())
+		return Super::GetActorsToFocus();
+
+	const UWorld* editorWorld = GEditor->GetEditorWorldContext().World();
+	if (editorWorld == nullptr)
+		return Super::GetActorsToFocus();
+
+	TSet<AActor*> actors {};
+
+	// translate Flow name into engine types
+	const EGameplayContainerMatchType containerMatchType = (IdentityMatchType == EFlowTagContainerMatchType::HasAny || IdentityMatchType == EFlowTagContainerMatchType::HasAnyExact) ? EGameplayContainerMatchType::Any : EGameplayContainerMatchType::All;
+	const bool exactMatch = (IdentityMatchType == EFlowTagContainerMatchType::HasAnyExact || IdentityMatchType == EFlowTagContainerMatchType::HasAllExact);
+
+	// Iterate all actors of the world to find all matching actors
+	for (FActorIterator it(editorWorld); it; ++it)
+	{
+		AActor* actor{ *it };
+		TInlineComponentArray<UFlowComponent*> actorFlowComponents(actor);
+		actor->GetComponents(actorFlowComponents);
+
+		// Iterate all flow component of the actor until a match is found
+		for (const UFlowComponent* flowComponent : actorFlowComponents)
+		{
+			if (!flowComponent->IdentityTags.IsValid())
+				continue;
+
+			if (containerMatchType == EGameplayContainerMatchType::Any)
+			{
+				if (exactMatch)
+				{
+					if (flowComponent->IdentityTags.HasAnyExact(IdentityTags))
+					{
+						actors.Add(actor);
+						break; // process next actor
+					}
+				}
+				else
+				{
+					if (flowComponent->IdentityTags.HasAny(IdentityTags))
+					{
+						actors.Add(actor);
+						break; // process next actor
+					}
+				}
+			}
+			else // == EGameplayContainerMatchType::All
+			{
+				if (exactMatch)
+				{
+					if (flowComponent->IdentityTags.HasAllExact(IdentityTags))
+					{
+						actors.Add(actor);
+						break; // process next actor
+					}
+				}
+				else
+				{
+					if (flowComponent->IdentityTags.HasAll(IdentityTags))
+					{
+						actors.Add(actor);
+						break; // process next actor
+					}
+				}
+			}
+		}
+	}
+
+	return actors;
+}
+
+#endif // WITH_EDITOR
+// !#ARKREP_MODIFIED_CODE
 
 void UFlowNode_ComponentObserver::ExecuteInput(const FName& PinName)
 {

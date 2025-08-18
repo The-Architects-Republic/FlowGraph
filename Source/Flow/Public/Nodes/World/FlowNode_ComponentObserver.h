@@ -20,6 +20,14 @@ class FLOW_API UFlowNode_ComponentObserver : public UFlowNode
 	
 	friend class FFlowNode_ComponentObserverDetails;
 
+// #ARKREP_MODIFIED_CODE : Added override to GetActorToFocus()
+public:
+#if WITH_EDITOR
+	virtual AActor* GetActorToFocus() override;
+	virtual TSet<AActor*> GetActorsToFocus() override;
+#endif
+// !#ARKREP_MODIFIED_CODE
+
 protected:
 	UPROPERTY(EditAnywhere, Category = "ObservedComponent")
 	FGameplayTagContainer IdentityTags;

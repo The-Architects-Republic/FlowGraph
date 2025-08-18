@@ -56,6 +56,15 @@ void FFlowEditorStyle::Initialize()
 	StyleSet->Set("Flow.Node.Body", new BOX_BRUSH("Icons/FlowNode_Body", FMargin(16.f/64.f)));
 	StyleSet->Set("Flow.Node.ActiveShadow", new BOX_BRUSH("Icons/FlowNode_Shadow_Active", FMargin(18.0f/64.0f)));
 	StyleSet->Set("Flow.Node.WasActiveShadow", new BOX_BRUSH("Icons/FlowNode_Shadow_WasActive", FMargin(18.0f/64.0f)));
+	
+// #ARKREP_MODIFIED_CODE : Added 'start here' related styles
+	StyleSet->SetContentRoot(FPaths::EngineContentDir() / TEXT("Editor/Slate/"));
+	StyleSet->Set("FlowGraph.StartHere", new IMAGE_BRUSH("Graph/Icons/Event", Icon16));
+	StyleSet->Set("FlowGraph.CancelStartHere", new IMAGE_BRUSH("Graph/Icons/Event_Disconnected", Icon16));
+
+	StyleSet->SetContentRoot(IPluginManager::Get().FindPlugin(TEXT("Flow"))->GetBaseDir() / TEXT("Resources"));
+	StyleSet->Set("Flow.Node.StartHereShadow", new BOX_BRUSH("Icons/FlowNode_Shadow_StartHere", FMargin(18.0f/64.0f)));
+// !#ARKREP_MODIFIED_CODE
 
 	FSlateStyleRegistry::RegisterSlateStyle(*StyleSet.Get());
 };

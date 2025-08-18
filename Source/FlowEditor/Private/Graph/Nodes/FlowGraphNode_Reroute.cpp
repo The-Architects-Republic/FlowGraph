@@ -2,6 +2,9 @@
 
 #include "Graph/Nodes/FlowGraphNode_Reroute.h"
 #include "SGraphNodeKnot.h"
+// #ARKREP_MODIFIED_CODE : Use our custom SFlowGraphNodeKnot
+#include "Graph/Widgets/SFlowGraphNodeKnot.h"
+// !#ARKREP_MODIFIED_CODE 
 
 #include "Nodes/Route/FlowNode_Reroute.h"
 
@@ -15,7 +18,9 @@ UFlowGraphNode_Reroute::UFlowGraphNode_Reroute(const FObjectInitializer& ObjectI
 
 TSharedPtr<SGraphNode> UFlowGraphNode_Reroute::CreateVisualWidget()
 {
-	return SNew(SGraphNodeKnot, this);
+// #ARKREP_MODIFIED_CODE : Use our custom SFlowGraphNodeKnot
+	return SNew(SFlowGraphNodeKnot, this);
+	// return SNew(SGraphNodeKnot, this);
 }
 
 bool UFlowGraphNode_Reroute::ShouldDrawNodeAsControlPointOnly(int32& OutInputPinIndex, int32& OutOutputPinIndex) const

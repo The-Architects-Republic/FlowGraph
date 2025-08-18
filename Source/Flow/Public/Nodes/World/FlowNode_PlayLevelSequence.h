@@ -64,10 +64,10 @@ public:
 	
 protected:
 	UPROPERTY()
-	ULevelSequence* LoadedSequence;
+	TObjectPtr<ULevelSequence> LoadedSequence;
 
 	UPROPERTY()
-	UFlowLevelSequencePlayer* SequencePlayer;
+	TObjectPtr<UFlowLevelSequencePlayer> SequencePlayer;
 
 	// Play Rate set by the user in PlaybackSettings
 	float CachedPlayRate;
@@ -85,8 +85,10 @@ protected:
 
 public:
 #if WITH_EDITOR
+	// IFlowContextPinSupplierInterface
 	virtual bool SupportsContextPins() const override { return true; }
-	virtual TArray<FFlowPin> GetContextOutputs() override;
+	virtual TArray<FFlowPin> GetContextOutputs() const override;
+	// --
 
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
@@ -95,7 +97,8 @@ public:
 	virtual void FlushContent() override;
 
 	virtual void InitializeInstance() override;
-	void CreatePlayer();
+//#ARKREP_MODIFIED_CODE : Added virtual to the CreatePlayer() function
+	virtual void CreatePlayer();
 
 protected:
 	virtual void ExecuteInput(const FName& PinName) override;

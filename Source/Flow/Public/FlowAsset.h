@@ -39,10 +39,41 @@ DECLARE_DELEGATE(FFlowGraphEvent);
 
 #endif
 
+// Working Data struct for the Harvest Data Pins operation
+// (passed between functions involved in the harvesting operation to simplify the function signatures)
+struct FFlowHarvestDataPinsWorkingData
+{
+	FFlowHarvestDataPinsWorkingData(UFlowNode& InFlowNode, const TMap<FName, FName>& PinNameMapPrev, const TArray<FFlowPin>& InputPinsPrev, const TArray<FFlowPin>& OutputPinsPrev)
+		: FlowNode(&InFlowNode)
+		, PinNameToBoundPropertyNameMapPrev(PinNameMapPrev)
+		, AutoInputDataPinsPrev(InputPinsPrev)
+		, AutoOutputDataPinsPrev(OutputPinsPrev)
+		{ }
+
+#if WITH_EDITOR
+	bool DidPinNameToBoundPropertyNameMapChange() const;
+	bool DidAutoInputDataPinsChange() const;
+	bool DidAutoOutputDataPinsChange() const;
+#endif
+
+	UFlowNode* FlowNode = nullptr;
+
+	const TMap<FName, FName>& PinNameToBoundPropertyNameMapPrev;
+	const TArray<FFlowPin>& AutoInputDataPinsPrev;
+	const TArray<FFlowPin>& AutoOutputDataPinsPrev;
+	
+	TMap<FName, FName> PinNameToBoundPropertyNameMapNext;
+	TArray<FFlowPin> AutoInputDataPinsNext;
+	TArray<FFlowPin> AutoOutputDataPinsNext;
+
+	bool bPinNameMapChanged = false;
+};
+
 /**
  * Single asset containing flow nodes.
+ * #ARKREP_MODIFIED_CODE : Added HideDropdown so it cannot be used to create an asset because we must only use our derived child classes.
  */
-UCLASS(BlueprintType, hideCategories = Object)
+UCLASS(BlueprintType, HideDropdown, hideCategories = Object)
 class FLOW_API UFlowAsset : public UObject
 {
 	GENERATED_UCLASS_BODY()
@@ -61,7 +92,7 @@ public:
 	FGuid AssetGuid;
 
 	// Set it to False, if this asset is instantiated as Root Flow for owner that doesn't live in the world
-	// This allow to SaveGame support works properly, if owner of Root Flow would be Game Instance or its subsystem
+	// This allows to SaveGame support works properly, if owner of Root Flow would be Game Instance or its subsystem
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flow Asset")
 	bool bWorldBound;
 
@@ -69,6 +100,7 @@ public:
 // Graph
 
 #if WITH_EDITOR
+public:	
 	friend class UFlowGraph;
 
 	// UObject
@@ -78,24 +110,32 @@ public:
 	virtual void PostLoad() override;
 	// --
 
-	virtual EDataValidationResult ValidateAsset(FFlowMessageLog& MessageLog);
-
-	// Returns whether the node class is allowed in this flow asset
-	bool IsNodeClassAllowed(const UClass* FlowNodeClass, FText* OutOptionalFailureReason = nullptr) const;
+public:
+	FSimpleDelegate OnDetailsRefreshRequested;
 
 	static FString ValidationError_NodeClassNotAllowed;
 	static FString ValidationError_NullNodeInstance;
+
+	virtual EDataValidationResult ValidateAsset(FFlowMessageLog& MessageLog);
+
+	// Returns whether the node class is allowed in this flow asset
+	bool IsNodeOrAddOnClassAllowed(const UClass* FlowNodeClass, FText* OutOptionalFailureReason = nullptr) const;
 
 protected:
 	bool CanFlowNodeClassBeUsedByFlowAsset(const UClass& FlowNodeClass) const;
 	bool CanFlowAssetUseFlowNodeClass(const UClass& FlowNodeClass) const;
 	bool CanFlowAssetReferenceFlowNode(const UClass& FlowNodeClass, FText* OutOptionalFailureReason = nullptr) const;
+
+	bool IsFlowNodeClassInAllowedClasses(const UClass& FlowNodeClass, const TSubclassOf<UFlowNodeBase> RequiredAncestor = nullptr) const;
+	bool IsFlowNodeClassInDeniedClasses(const UClass& FlowNodeClass) const;
 #endif
 
 	// IFlowGraphInterface
 #if WITH_EDITORONLY_DATA
-
-private:
+	
+// #ARKREP_MODIFIED_CODE : made 'FlowGraph' protected (previously private)
+//private:
+protected:
 	UPROPERTY()
 	TObjectPtr<UEdGraph> FlowGraph;
 
@@ -115,17 +155,17 @@ public:
 // Nodes
 
 protected:
-	TArray<TSubclassOf<UFlowNode>> AllowedNodeClasses;
-	TArray<TSubclassOf<UFlowNode>> DeniedNodeClasses;
+	TArray<TSubclassOf<UFlowNodeBase>> AllowedNodeClasses;
+	TArray<TSubclassOf<UFlowNodeBase>> DeniedNodeClasses;
 
-	TArray<TSubclassOf<UFlowNode>> AllowedInSubgraphNodeClasses;
-	TArray<TSubclassOf<UFlowNode>> DeniedInSubgraphNodeClasses;
+	TArray<TSubclassOf<UFlowNodeBase>> AllowedInSubgraphNodeClasses;
+	TArray<TSubclassOf<UFlowNodeBase>> DeniedInSubgraphNodeClasses;
 	
 	bool bStartNodePlacedAsGhostNode;
 
 private:
 	UPROPERTY()
-	TMap<FGuid, UFlowNode*> Nodes;
+	TMap<FGuid, TObjectPtr<UFlowNode>> Nodes;
 
 #if WITH_EDITORONLY_DATA
 protected:
@@ -155,9 +195,29 @@ public:
 
 	// Processes all nodes and creates map of all pin connections
 	void HarvestNodeConnections();
+
+	// Updates the auto-generated pins and bindings for a given FlowNode,
+	// returns true if any changes were made.
+	bool TryUpdateManagedFlowPinsForNode(UFlowNode& FlowNode);
+
+protected:
+	void AddDataPinPropertyBindingToMap(
+		const FName& PinAuthoredName,
+		const FName& PropertyAuthoredName,
+		FFlowHarvestDataPinsWorkingData& InOutData);
+	virtual bool TryCreateFlowDataPinFromMetadataValue(
+		const FString& MetadataValue,
+		UFlowNode& FlowNode,
+		const FProperty& Property,
+		const FText& PinDisplayName,
+		const bool bIsInputPin,
+		TArray<FFlowPin>* InOutDataPinsNext) const;
+
+	void HarvestFlowPinMetadataForProperty(const FProperty* Property, FFlowHarvestDataPinsWorkingData& InOutData);
 #endif
 
-	const TMap<FGuid, UFlowNode*>& GetNodes() const { return Nodes; }
+public:
+	const TMap<FGuid, UFlowNode*>& GetNodes() const { return ObjectPtrDecay(Nodes); }
 	UFlowNode* GetNode(const FGuid& Guid) const { return Nodes.FindRef(Guid); }
 
 	template <class T>
@@ -176,11 +236,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "FlowAsset")
 	virtual UFlowNode* GetDefaultEntryNode() const;
 
+// #ARKREP_MODIFIED_CODE : Made function const
 	UFUNCTION(BlueprintPure, Category = "FlowAsset", meta = (DeterminesOutputType = "FlowNodeClass"))
-	TArray<UFlowNode*> GetNodesInExecutionOrder(UFlowNode* FirstIteratedNode, const TSubclassOf<UFlowNode> FlowNodeClass);
+	TArray<UFlowNode*> GetNodesInExecutionOrder(UFlowNode* FirstIteratedNode, const TSubclassOf<UFlowNode> FlowNodeClass) const;
 
+// #ARKREP_MODIFIED_CODE : Made function const
 	template <class T>
-	void GetNodesInExecutionOrder(UFlowNode* FirstIteratedNode, TArray<T*>& OutNodes)
+	void GetNodesInExecutionOrder(UFlowNode* FirstIteratedNode, TArray<T*>& OutNodes) const
 	{
 		static_assert(TPointerIsConvertibleFromTo<T, const UFlowNode>::Value, "'T' template parameter to GetNodesInExecutionOrder must be derived from UFlowNode");
 
@@ -192,8 +254,9 @@ public:
 	}
 
 protected:
+// #ARKREP_MODIFIED_CODE : Made function const
 	template <class T>
-	void GetNodesInExecutionOrder_Recursive(UFlowNode* Node, TSet<TObjectKey<UFlowNode>>& IteratedNodes, TArray<T*>& OutNodes)
+	void GetNodesInExecutionOrder_Recursive(UFlowNode* Node, TSet<TObjectKey<UFlowNode>>& IteratedNodes, TArray<T*>& OutNodes) const
 	{
 		IteratedNodes.Add(Node);
 
@@ -202,7 +265,7 @@ protected:
 			OutNodes.Emplace(NodeOfRequiredType);
 		}
 
-		for (UFlowNode* ConnectedNode : Node->GetConnectedNodes())
+		for (UFlowNode* ConnectedNode : Node->GatherConnectedNodes())
 		{
 			if (ConnectedNode && !IteratedNodes.Contains(ConnectedNode))
 			{
@@ -210,6 +273,12 @@ protected:
 			}
 		}
 	}
+
+
+// #ARKREP_MODIFIED_CODE : Added GetStartHereNode() function 
+#if WITH_EDITOR
+	UFlowNode* GetStartHereNode() const;
+#endif
 
 public:	
 	UFlowNode_CustomInput* TryFindCustomInputNodeByEventName(const FName& EventName) const;
@@ -232,12 +301,14 @@ protected:
 	
 //////////////////////////////////////////////////////////////////////////
 // Instances of the template asset
-
-private:
+	
+// #ARKREP_MODIFIED_CODE : Made ActiveInstances protected instead of private because we need to access it from the child class
+protected:
 	// Original object holds references to instances
 	UPROPERTY(Transient)
-	TArray<UFlowAsset*> ActiveInstances;
+	TArray<TObjectPtr<UFlowAsset>> ActiveInstances;
 
+private:
 #if WITH_EDITORONLY_DATA
 	TWeakObjectPtr<UFlowAsset> InspectedInstance;
 
@@ -264,14 +335,14 @@ public:
 	FRefreshDebuggerEvent& OnDebuggerRefresh() { return RefreshDebuggerEvent; }
 	FRefreshDebuggerEvent RefreshDebuggerEvent;
 
-	DECLARE_EVENT_TwoParams(UFlowAsset, FRuntimeMessageEvent, UFlowAsset*, const TSharedRef<FTokenizedMessage>&);
+	DECLARE_EVENT_TwoParams(UFlowAsset, FRuntimeMessageEvent, const UFlowAsset*, const TSharedRef<FTokenizedMessage>&);
 
 	FRuntimeMessageEvent& OnRuntimeMessageAdded() { return RuntimeMessageEvent; }
 	FRuntimeMessageEvent RuntimeMessageEvent;
 
 private:
 	void BroadcastDebuggerRefresh() const;
-	void BroadcastRuntimeMessageAdded(const TSharedRef<FTokenizedMessage>& Message);
+	void BroadcastRuntimeMessageAdded(const TSharedRef<FTokenizedMessage>& Message) const;
 #endif
 
 //////////////////////////////////////////////////////////////////////////
@@ -279,7 +350,7 @@ private:
 
 protected:
 	UPROPERTY()
-	UFlowAsset* TemplateAsset;
+	TObjectPtr<UFlowAsset> TemplateAsset;
 
 	// Object that spawned Root Flow instance, i.e. World Settings or Player Controller
 	// This pointer is passed to child instances: Flow Asset instances created by the SubGraph nodes
@@ -293,18 +364,18 @@ protected:
 
 	// Optional entry points to the graph, similar to blueprint Custom Events
 	UPROPERTY()
-	TSet<UFlowNode_CustomInput*> CustomInputNodes;
+	TSet<TObjectPtr<UFlowNode_CustomInput>> CustomInputNodes;
 
 	UPROPERTY()
-	TSet<UFlowNode*> PreloadedNodes;
+	TSet<TObjectPtr<UFlowNode>> PreloadedNodes;
 
 	// Nodes that have any work left, not marked as Finished yet
 	UPROPERTY()
-	TArray<UFlowNode*> ActiveNodes;
+	TArray<TObjectPtr<UFlowNode>> ActiveNodes;
 
 	// All nodes active in the past, done their work
 	UPROPERTY()
-	TArray<UFlowNode*> RecordedNodes;
+	TArray<TObjectPtr<UFlowNode>> RecordedNodes;
 
 	EFlowFinishPolicy FinishPolicy;
 
@@ -333,12 +404,12 @@ public:
 	virtual void PreloadNodes() {}
 
 	virtual void PreStartFlow();
-	virtual void StartFlow();
+	virtual void StartFlow(IFlowDataPinValueSupplierInterface* DataPinValueSupplier = nullptr);
 
 	virtual void FinishFlow(const EFlowFinishPolicy InFinishPolicy, const bool bRemoveInstance = true);
 
 	bool HasStartedFlow() const;
-	void TriggerCustomInput(const FName& EventName);
+	void TriggerCustomInput(const FName& EventName, IFlowDataPinValueSupplierInterface* DataPinValueSupplier = nullptr);
 
 	// Get Flow Asset instance created by the given SubGraph node
 	TWeakObjectPtr<UFlowAsset> GetFlowInstance(UFlowNode_SubGraph* SubGraphNode) const;
@@ -412,8 +483,8 @@ public:
 
 #if WITH_EDITOR
 public:
-	void LogError(const FString& MessageToLog, UFlowNode* Node);
-	void LogWarning(const FString& MessageToLog, UFlowNode* Node);
-	void LogNote(const FString& MessageToLog, UFlowNode* Node);
+	void LogError(const FString& MessageToLog, const UFlowNodeBase* Node) const;
+	void LogWarning(const FString& MessageToLog, const UFlowNodeBase* Node) const;
+	void LogNote(const FString& MessageToLog, const UFlowNodeBase* Node) const;
 #endif
 };

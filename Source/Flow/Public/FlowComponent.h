@@ -7,7 +7,7 @@
 
 #include "FlowSave.h"
 #include "FlowTypes.h"
-#include "FlowOwnerInterface.h"
+#include "Interfaces/FlowOwnerInterface.h"
 #include "FlowComponent.generated.h"
 
 class UFlowAsset;
@@ -41,9 +41,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FFlowComponentDynamicNotify, class 
 /**
 * Base component of Flow System - makes possible to communicate between Actor, Flow Subsystem and Flow Graphs
 */
-UCLASS(Blueprintable, meta = (BlueprintSpawnableComponent))
+UCLASS(NotBlueprintable)
 class FLOW_API UFlowComponent : public UActorComponent, public IFlowOwnerInterface
 {
+// #ARKREP_MODIFIED_CODE: Removed Blueprintable and meta=(BlueprintSpawnableComponent) from this component because we want to use our child component.
 	GENERATED_UCLASS_BODY()
 
 	friend class UFlowSubsystem;
@@ -84,7 +85,8 @@ public:
 protected:
 	void RegisterWithFlowSubsystem();
 	void UnregisterWithFlowSubsystem();
-	
+	virtual void BeginRootFlow(bool bComponentLoadedFromSaveGame);
+
 private:
 	UFUNCTION()
 	void OnRep_AddedIdentityTags();
@@ -117,12 +119,12 @@ public:
 	const FGameplayTagContainer& GetRecentlySentNotifyTags() const { return RecentlySentNotifyTags; }
 
 	// Send single notification from the actor to Flow graphs
-	// If set on server, it always going to be replicated to clients
+	// If set on server, it's always going to be replicated to clients
 	UFUNCTION(BlueprintCallable, Category = "Flow")
 	void NotifyGraph(const FGameplayTag NotifyTag, const EFlowNetMode NetMode = EFlowNetMode::Authority);
 
 	// Send multiple notifications at once - from the actor to Flow graphs
-	// If set on server, it always going to be replicated to clients
+	// If set on server, it's always going to be replicated to clients
 	UFUNCTION(BlueprintCallable, Category = "Flow")
 	void BulkNotifyGraph(const FGameplayTagContainer NotifyTags, const EFlowNetMode NetMode = EFlowNetMode::Authority);
 
@@ -176,7 +178,7 @@ private:
 public:
 	// Asset that might instantiated as "Root Flow" 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RootFlow")
-	UFlowAsset* RootFlow;
+	TObjectPtr<UFlowAsset> RootFlow;
 
 	// If true, component will start Root Flow on Begin Play
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "RootFlow")
@@ -192,15 +194,15 @@ public:
 
 	UPROPERTY(SaveGame)
 	FString SavedAssetInstanceName;
-	
+
 	// This will instantiate Flow Asset assigned on this component.
 	// Created Flow Asset instance will be a "root flow", as additional Flow Assets can be instantiated via Sub Graph node
 	UFUNCTION(BlueprintCallable, Category = "RootFlow")
-	void StartRootFlow();
+	virtual void StartRootFlow();
 
 	// This will destroy instantiated Flow Asset - created from asset assigned on this component.
 	UFUNCTION(BlueprintCallable, Category = "RootFlow")
-	void FinishRootFlow(UFlowAsset* TemplateAsset, const EFlowFinishPolicy FinishPolicy);
+	virtual void FinishRootFlow(UFlowAsset* TemplateAsset, const EFlowFinishPolicy FinishPolicy);
 
 	UFUNCTION(BlueprintPure, Category = "FlowSubsystem")
 	TSet<UFlowAsset*> GetRootInstances(const UObject* Owner) const;

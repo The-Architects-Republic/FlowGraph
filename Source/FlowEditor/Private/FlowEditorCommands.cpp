@@ -53,6 +53,14 @@ void FFlowGraphCommands::RegisterCommands()
 
 	UI_COMMAND(FocusViewport, "Focus Viewport", "Focus viewport on actor assigned to the node", EUserInterfaceActionType::Button, FInputChord());
 	UI_COMMAND(JumpToNodeDefinition, "Jump to Node Definition", "Jump to the node definition", EUserInterfaceActionType::Button, FInputChord());
+
+// #ARKREP_MODIFIED_CODE : Added StartHere and CancelStartHere commands
+	UI_COMMAND(StartHere, "Start Here",
+		"[Editor only] Start the execution of the graph at this node. Previous nodes will be ignored."
+		"The node will not be executed, only its first output will be.",
+		EUserInterfaceActionType::Button, FInputChord());
+	UI_COMMAND(CancelStartHere, "Cancel Start Here", "Cancel the start execution of the graph at this node", EUserInterfaceActionType::Button, FInputChord());
+// !#ARKREP_MODIFIED_CODE 
 }
 
 FFlowSpawnNodeCommands::FFlowSpawnNodeCommands()

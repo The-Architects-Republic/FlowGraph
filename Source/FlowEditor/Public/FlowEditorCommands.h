@@ -53,6 +53,11 @@ public:
 	/** Jumps */
 	TSharedPtr<FUICommandInfo> FocusViewport;
 	TSharedPtr<FUICommandInfo> JumpToNodeDefinition;
+	
+// #ARKREP_MODIFIED_CODE : Added StartHere and CancelStartHere commands
+	TSharedPtr<FUICommandInfo> StartHere;
+	TSharedPtr<FUICommandInfo> CancelStartHere;
+// !#ARKREP_MODIFIED_CODE 
 
 	virtual void RegisterCommands() override;
 };

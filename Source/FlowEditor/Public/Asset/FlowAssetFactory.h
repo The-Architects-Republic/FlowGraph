@@ -5,9 +5,11 @@
 #include "Factories/Factory.h"
 #include "FlowAssetFactory.generated.h"
 
-UCLASS(HideCategories = Object)
+UCLASS(Abstract, HideCategories = Object)
 class FLOWEDITOR_API UFlowAssetFactory : public UFactory
 {
+/* #ARK_REP_MODIFIED_CODE : Added Abstract to this class because we made our own factory (UARKGraphAssetFactory)
+ * and we don't want this factory to be directly usable. */
 	GENERATED_UCLASS_BODY()
 
 	UPROPERTY(EditAnywhere, Category = Asset)
