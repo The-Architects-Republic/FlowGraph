@@ -30,8 +30,8 @@ using namespace EFlowForEachAddOnFunctionReturnValue_Classifiers;
 
 UFlowNodeBase::UFlowNodeBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
-	, GraphNode(nullptr)
 #if WITH_EDITORONLY_DATA
+	, GraphNode(nullptr)
 	, bDisplayNodeTitleWithoutPrefix(true)
 	, bCanDelete(true)
 	, bCanDuplicate(true)
@@ -204,7 +204,7 @@ const FFlowPin* UFlowNodeBase::FindFlowPinByName(const FName& PinName, const TAr
 
 FFlowPin* UFlowNodeBase::FindFlowPinByName(const FName& PinName, TArray<FFlowPin>& FlowPins)
 {
-	return FlowPins.FindByPredicate([&PinName](FFlowPin& FlowPin)
+	return FlowPins.FindByPredicate([&PinName](const FFlowPin& FlowPin)
 	{
 		return FlowPin.PinName == PinName;
 	});
@@ -575,16 +575,13 @@ EFlowForEachAddOnFunctionReturnValue UFlowNodeBase::ForEachAddOnForClass(const U
 	return ReturnValue;
 }
 
+#if WITH_EDITOR
 void UFlowNodeBase::PostLoad()
 {
 	Super::PostLoad();
 
-#if WITH_EDITOR
 	EnsureNodeDisplayStyle();
-#endif
 }
-
-#if WITH_EDITOR
 
 void UFlowNodeBase::SetGraphNode(UEdGraphNode* NewGraphNode)
 {
@@ -701,7 +698,6 @@ FText UFlowNodeBase::GetNodeToolTip() const
 			return FText::FromString(BlueprintTitle);
 		}
 	}
-	
 
 	return GetClass()->GetToolTipText();
 }
@@ -714,20 +710,20 @@ FText UFlowNodeBase::GetNodeConfigText() const
 FText UFlowNodeBase::GetGeneratedDisplayName() const
 {
 	static const FName NAME_GeneratedDisplayName(TEXT("GeneratedDisplayName"));
-	
+
 	if (GetClass()->ClassGeneratedBy)
 	{
 		UClass* Class = Cast<UBlueprint>(GetClass()->ClassGeneratedBy)->GeneratedClass;
 		return Class->GetMetaDataText(NAME_GeneratedDisplayName);
 	}
-	
+
 	return GetClass()->GetMetaDataText(NAME_GeneratedDisplayName);
 }
 
 void UFlowNodeBase::EnsureNodeDisplayStyle()
 {
-	// todo: remove in Flow 2.1
-	
+	// todo: remove in Flow 2.2
+
 	// Backward compatibility update to convert NodeStyle to NodeDisplayStyle
 	FLOW_ASSERT_ENUM_MAX(EFlowNodeStyle, 7);
 
@@ -810,21 +806,21 @@ void UFlowNodeBase::LogError(FString Message, const EFlowOnScreenMessageType OnS
 		// OnScreen Message
 		if (OnScreenMessageType == EFlowOnScreenMessageType::Permanent)
 		{
-			if (GetWorld())
+			if (UWorld* World = GetWorld())
 			{
-				if (UViewportStatsSubsystem* StatsSubsystem = GetWorld()->GetSubsystem<UViewportStatsSubsystem>())
+				if (UViewportStatsSubsystem* StatsSubsystem = World->GetSubsystem<UViewportStatsSubsystem>())
 				{
-// #ARKREP_MODIFIED_CODE : Use this as a weak ptr to prevent random crash if the node gets destroyed before the lambda callback is called
-					TWeakObjectPtr<const UFlowNodeBase> weakThis { this };
-					StatsSubsystem->AddDisplayDelegate([weakThis, Message](FText& OutText, FLinearColor& OutColor)
+					StatsSubsystem->AddDisplayDelegate([WeakThis = TWeakObjectPtr<const UFlowNodeBase>(this), Message](FText& OutText, FLinearColor& OutColor)
 					{
-						if (weakThis.IsStale() || !weakThis.IsValid())
-							return false;
+						const UFlowNodeBase* ThisPtr = WeakThis.Get();
+						if (ThisPtr && ThisPtr->GetFlowNodeSelfOrOwner()->GetActivationState() != EFlowNodeState::NeverActivated)
+						{
+							OutText = FText::FromString(Message);
+							OutColor = FLinearColor::Red;
+							return true;
+						}
 
-						OutText = FText::FromString(Message);
-						OutColor = FLinearColor::Red;
-
-						return IsValid(weakThis.Get()) && weakThis->GetFlowNodeSelfOrOwner()->GetActivationState() != EFlowNodeState::NeverActivated;
+						return false;
 					});
 				}
 			}
@@ -837,9 +833,12 @@ void UFlowNodeBase::LogError(FString Message, const EFlowOnScreenMessageType OnS
 		// Output Log
 		UE_LOG(LogFlow, Error, TEXT("%s"), *Message);
 
-		// Message Log
 #if WITH_EDITOR
-		GetFlowAsset()->GetTemplateAsset()->LogError(Message, this);
+		if (GEditor)
+		{
+			// Message Log
+			GetFlowAsset()->GetTemplateAsset()->LogError(Message, this);
+		}
 #endif
 	}
 #endif
@@ -853,9 +852,12 @@ void UFlowNodeBase::LogWarning(FString Message) const
 		// Output Log
 		UE_LOG(LogFlow, Warning, TEXT("%s"), *Message);
 
-		// Message Log
 #if WITH_EDITOR
-		GetFlowAsset()->GetTemplateAsset()->LogWarning(Message, this);
+		if (GEditor)
+		{
+			// Message Log
+			GetFlowAsset()->GetTemplateAsset()->LogWarning(Message, this);
+		}
 #endif
 	}
 #endif
@@ -869,9 +871,12 @@ void UFlowNodeBase::LogNote(FString Message) const
 		// Output Log
 		UE_LOG(LogFlow, Log, TEXT("%s"), *Message);
 
-		// Message Log
 #if WITH_EDITOR
-		GetFlowAsset()->GetTemplateAsset()->LogNote(Message, this);
+		if (GEditor)
+		{
+			// Message Log
+			GetFlowAsset()->GetTemplateAsset()->LogNote(Message, this);
+		}
 #endif
 	}
 #endif
@@ -891,7 +896,7 @@ void UFlowNodeBase::LogVerbose(FString Message) const
 #if !UE_BUILD_SHIPPING
 bool UFlowNodeBase::BuildMessage(FString& Message) const
 {
-	UFlowAsset* FlowAsset = GetFlowAsset();
+	const UFlowAsset* FlowAsset = GetFlowAsset();
 	if (FlowAsset && FlowAsset->GetTemplateAsset()) // this is runtime log which is should be only called on runtime instances of asset
 	{
 		const FString TemplatePath = FlowAsset->GetTemplateAsset()->GetPathName();

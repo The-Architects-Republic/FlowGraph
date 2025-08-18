@@ -18,6 +18,7 @@ public class FlowEditor : ModuleRules
 			"AssetSearch",
 			"EditorSubsystem",
 			"Flow",
+			"FlowDebugger",
 			"MessageLog"
 		});
 
@@ -56,6 +57,7 @@ public class FlowEditor : ModuleRules
 			"PropertyPath",
 			"RenderCore",
 			"Sequencer",
+			"SequencerCore",
 			"Slate",
 			"SlateCore",
 			"SourceControl",

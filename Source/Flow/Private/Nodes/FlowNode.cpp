@@ -76,21 +76,15 @@ void UFlowNode::PostLoad()
 
 bool UFlowNode::IsSupportedInputPinName(const FName& PinName) const
 {
+	const FFlowPin* InputPin = FindFlowPinByName(PinName, InputPins);
+
 	if (AddOns.IsEmpty())
 	{
-		checkf(FindFlowPinByName(PinName, InputPins), TEXT("Only AddOns should introduce unknown Pins to a FlowNode, so if we have no AddOns, we should have no unknown pins"));
-
+		checkf(InputPin, TEXT("Only AddOns should introduce unknown Pins to a FlowNode, so if we have no AddOns, we should have no unknown pins"));
 		return true;
 	}
 
-	if (const FFlowPin* FoundInputFlowPin = FindFlowPinByName(PinName, InputPins))
-	{
-		return true;
-	}
-	else
-	{
-		return false;
-	}
+	return (InputPin != nullptr);
 }
 
 void UFlowNode::AddInputPins(const TArray<FFlowPin>& Pins)
@@ -813,23 +807,19 @@ void UFlowNode::TriggerInput(const FName& PinName, const EFlowPinActivationType 
 		TArray<FPinRecord>& Records = InputRecords.FindOrAdd(PinName);
 		Records.Add(FPinRecord(FApp::GetCurrentTime(), ActivationType));
 
-		LogVerbose(FString::Printf(TEXT("Triggering input %s."), *PinName.ToString()));
-#endif // UE_BUILD_SHIPPING
-
-#if WITH_EDITOR
-		if (GEditor && UFlowAsset::GetFlowGraphInterface().IsValid())
+		if (const UFlowAsset* FlowAssetTemplate = GetFlowAsset()->GetTemplateAsset())
 		{
-			UFlowAsset::GetFlowGraphInterface()->OnInputTriggered(GraphNode, InputPins.IndexOfByKey(PinName));
+			(void)FlowAssetTemplate->OnPinTriggered.ExecuteIfBound(NodeGuid, PinName);
 		}
-#endif // WITH_EDITOR
+#endif
 	}
+#if !UE_BUILD_SHIPPING
 	else
 	{
-#if !UE_BUILD_SHIPPING
 		LogError(FString::Printf(TEXT("Input Pin name %s invalid"), *PinName.ToString()));
-#endif // UE_BUILD_SHIPPING
 		return;
 	}
+#endif
 
 	switch (SignalMode)
 	{
@@ -863,6 +853,13 @@ void UFlowNode::TriggerFirstOutput(const bool bFinish)
 
 void UFlowNode::TriggerOutput(const FName PinName, const bool bFinish /*= false*/, const EFlowPinActivationType ActivationType /*= Default*/)
 {
+	if (ActivationState == EFlowNodeState::Completed || ActivationState == EFlowNodeState::Aborted)
+	{
+		// do not trigger output if node is already finished or aborted
+		LogError(TEXT("Trying to TriggerOutput after finished or aborted"));
+		return;
+	}
+
 	// clean up node, if needed
 	if (bFinish)
 	{
@@ -876,12 +873,9 @@ void UFlowNode::TriggerOutput(const FName PinName, const bool bFinish /*= false*
 		TArray<FPinRecord>& Records = OutputRecords.FindOrAdd(PinName);
 		Records.Add(FPinRecord(FApp::GetCurrentTime(), ActivationType));
 
-		LogVerbose(FString::Printf(TEXT("\n Triggering output: %s.  bFinish: %s "), *PinName.ToString(), bFinish ? TEXT("true") : TEXT("false")));
-
-#if WITH_EDITOR
-		if (GEditor && UFlowAsset::GetFlowGraphInterface().IsValid())
+		if (const UFlowAsset* FlowAssetTemplate = GetFlowAsset()->GetTemplateAsset())
 		{
-			UFlowAsset::GetFlowGraphInterface()->OnOutputTriggered(GraphNode, OutputPins.IndexOfByKey(PinName));
+			FlowAssetTemplate->OnPinTriggered.ExecuteIfBound(NodeGuid, PinName);
 		}
 
 // #ARKREP_MODIFIED_CODE : Added 'Non-executable nodes' related code
@@ -895,13 +889,12 @@ void UFlowNode::TriggerOutput(const FName PinName, const bool bFinish /*= false*
 			}
 		}
 // !#ARKREP_MODIFIED_CODE
-#endif
 	}
 	else
 	{
 		LogError(FString::Printf(TEXT("Output Pin name %s invalid"), *PinName.ToString()));
 	}
-#endif // UE_BUILD_SHIPPING
+#endif
 
 #if WITH_EDITOR
 	LogVerbose(FString::Printf(TEXT("\n Description: %s"), *GetNodeDescription()));
@@ -924,6 +917,12 @@ void UFlowNode::Finish()
 
 void UFlowNode::Deactivate()
 {
+	if (SignalMode == EFlowSignalMode::PassThrough)
+	{
+		// there is nothing to deactivate, node was never active
+		return;
+	}
+
 	if (GetFlowAsset()->FinishPolicy == EFlowFinishPolicy::Abort)
 	{
 		ActivationState = EFlowNodeState::Aborted;
@@ -1171,7 +1170,7 @@ FString UFlowNode::GetStatusStringForNodeAndAddOns() const
 	FString CombinedStatusString = GetStatusString();
 
 	// Give all of the AddOns a chance to add their status strings as well
-	(void) ForEachAddOnConst(
+	(void)ForEachAddOnConst(
 		[&CombinedStatusString](const UFlowNodeAddOn& AddOn)
 		{
 			const FString AddOnStatusString = AddOn.GetStatusString();

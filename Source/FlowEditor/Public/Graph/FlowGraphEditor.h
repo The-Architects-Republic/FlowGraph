@@ -9,6 +9,7 @@
 
 class FFlowAssetEditor;
 class IDetailsView;
+class UFlowDebuggerSubsystem;
 
 /**
  *
@@ -29,8 +30,9 @@ protected:
 
 	TWeakPtr<FFlowAssetEditor> FlowAssetEditor;
 	TSharedPtr<IDetailsView> DetailsView;
-
 	TSharedPtr<FUICommandList> CommandList;
+
+	TWeakObjectPtr<UFlowDebuggerSubsystem> DebuggerSubsystem;
 
 public:
 	void Construct(const FArguments& InArgs, const TSharedPtr<FFlowAssetEditor> InAssetEditor);
@@ -44,13 +46,20 @@ private:
 	static void UndoGraphAction();
 	static void RedoGraphAction();
 
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION < 6
 	static FReply OnSpawnGraphNodeByShortcut(FInputChord InChord, const FVector2D& InPosition, UEdGraph* InGraph);
+#else
+	static FReply OnSpawnGraphNodeByShortcut(FInputChord InChord, const FVector2f& InPosition, UEdGraph* InGraph);
+#endif
+
 	void OnCreateComment() const;
 
 public:
+	virtual bool IsTabFocused() const;
+	
 	static bool CanEdit();
 	static bool IsPIE();
-	virtual bool IsTabFocused() const;
+	static bool IsPlaySessionPaused();
 
 	virtual void SelectSingleNode(UEdGraphNode* Node);
 
@@ -94,8 +103,8 @@ protected:
 	virtual void OnNodeDoubleClicked(class UEdGraphNode* Node) const;
 	virtual void OnNodeTitleCommitted(const FText& NewText, ETextCommit::Type CommitInfo, UEdGraphNode* NodeBeingChanged);
 
-	virtual void RefreshContextPins() const;
-	virtual bool CanRefreshContextPins() const;
+	virtual void ReconstructNode() const;
+	virtual bool CanReconstructNode() const;
 
 private:
 	void AddInput() const;
@@ -122,7 +131,7 @@ private:
 	void OnEnableBreakpoint() const;
 	void OnEnablePinBreakpoint();
 
-	bool CanEnableBreakpoint();
+	bool CanEnableBreakpoint() const;
 	bool CanEnablePinBreakpoint();
 
 	void OnDisableBreakpoint() const;

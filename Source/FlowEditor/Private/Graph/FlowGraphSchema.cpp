@@ -17,8 +17,8 @@
 #include "Nodes/FlowNode.h"
 #include "Nodes/FlowNodeAddOnBlueprint.h"
 #include "Nodes/FlowNodeBlueprint.h"
-#include "Nodes/Route/FlowNode_CustomInput.h"
-#include "Nodes/Route/FlowNode_Start.h"
+#include "Nodes/Graph/FlowNode_CustomInput.h"
+#include "Nodes/Graph/FlowNode_Start.h"
 #include "Nodes/Route/FlowNode_Reroute.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -26,10 +26,14 @@
 #include "EdGraphSchema_K2.h"
 #include "Editor.h"
 #include "Engine/MemberReference.h"
-#include "Engine/UserDefinedStruct.h"
-#include "Kismet/BlueprintTypeConversions.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "ScopedTransaction.h"
+
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION < 6
+#include "Kismet/BlueprintTypeConversions.h"
+#else
+#include "Runtime/Engine/Internal/Kismet/BlueprintTypeConversions.h"
+#endif
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(FlowGraphSchema)
 
@@ -251,7 +255,7 @@ void UFlowGraphSchema::CreateDefaultNodesForGraph(UEdGraph& Graph) const
 	FVector2D NodeOffset = FVector2D::ZeroVector;
 
 	// Start node
-	CreateDefaultNode(Graph, AssetClassDefaults, UFlowNode_Start::StaticClass(), NodeOffset, AssetClassDefaults->bStartNodePlacedAsGhostNode);
+	CreateDefaultNode(Graph, UFlowNode_Start::StaticClass(), NodeOffset, AssetClassDefaults->bStartNodePlacedAsGhostNode);
 
 	// Add default nodes for all the CustomInputs
 	if (IsValid(AssetClassDefaults))
@@ -259,7 +263,7 @@ void UFlowGraphSchema::CreateDefaultNodesForGraph(UEdGraph& Graph) const
 		for (const FName& CustomInputName : AssetClassDefaults->CustomInputs)
 		{
 			NodeOffset += NodeOffsetIncrement;
-			const UFlowGraphNode* NewFlowGraphNode = CreateDefaultNode(Graph, AssetClassDefaults, UFlowNode_CustomInput::StaticClass(), NodeOffset, true);
+			const UFlowGraphNode* NewFlowGraphNode = CreateDefaultNode(Graph, UFlowNode_CustomInput::StaticClass(), NodeOffset, true);
 
 			UFlowNode_CustomInput* CustomInputNode = CastChecked<UFlowNode_CustomInput>(NewFlowGraphNode->GetFlowNodeBase());
 			CustomInputNode->SetEventName(CustomInputName);
@@ -270,7 +274,7 @@ void UFlowGraphSchema::CreateDefaultNodesForGraph(UEdGraph& Graph) const
 	FlowAsset->HarvestNodeConnections();
 }
 
-UFlowGraphNode* UFlowGraphSchema::CreateDefaultNode(UEdGraph& Graph, const UFlowAsset* AssetClassDefaults, const TSubclassOf<UFlowNode>& NodeClass, const FVector2D& Offset, const bool bPlacedAsGhostNode)
+UFlowGraphNode* UFlowGraphSchema::CreateDefaultNode(UEdGraph& Graph, const TSubclassOf<UFlowNode>& NodeClass, const FVector2D& Offset, const bool bPlacedAsGhostNode)
 {
 	UFlowGraphNode* NewGraphNode = FFlowGraphSchemaAction_NewNode::CreateNode(&Graph, nullptr, NodeClass, Offset);
 	SetNodeMetaData(NewGraphNode, FNodeMetadata::DefaultGraphNode);
@@ -570,11 +574,17 @@ const FPinConnectionResponse UFlowGraphSchema::CanMergeNodes(const UEdGraphNode*
 
 bool UFlowGraphSchema::TryCreateConnection(UEdGraphPin* PinA, UEdGraphPin* PinB) const
 {
-	const bool bModified = UEdGraphSchema::TryCreateConnection(PinA, PinB);
-
+	bool bModified = UEdGraphSchema::TryCreateConnection(PinA, PinB);
+	
 	if (bModified)
 	{
-		PinA->GetOwningNode()->GetGraph()->NotifyGraphChanged();
+		UFlowGraphNode* FlowGraphNodeA = Cast<UFlowGraphNode>(PinA->GetOwningNode());
+		UFlowGraphNode* FlowGraphNodeB = Cast<UFlowGraphNode>(PinB->GetOwningNode());
+
+		UEdGraph* EdGraph = FlowGraphNodeA->GetGraph();
+
+		EdGraph->NotifyNodeChanged(FlowGraphNodeA);
+		EdGraph->NotifyNodeChanged(FlowGraphNodeB);
 	}
 
 	return bModified;
@@ -751,17 +761,16 @@ bool UFlowGraphSchema::IsTitleBarPin(const UEdGraphPin& Pin) const
 void UFlowGraphSchema::BreakNodeLinks(UEdGraphNode& TargetNode) const
 {
 	Super::BreakNodeLinks(TargetNode);
-
-	UEdGraph* EdGraph = TargetNode.GetGraph();
-	if (IsValid(EdGraph))
-	{
-		EdGraph->NotifyGraphChanged();
-	}
 }
 
 void UFlowGraphSchema::BreakPinLinks(UEdGraphPin& TargetPin, bool bSendsNodeNotification) const
 {
 	const FScopedTransaction Transaction(LOCTEXT("GraphEd_BreakPinLinks", "Break Pin Links"));
+
+	TArray<UEdGraphPin*> CachedLinkedTo = TargetPin.LinkedTo;
+
+	UFlowGraphNode* OwningFlowGraphNode = Cast<UFlowGraphNode>(TargetPin.GetOwningNodeUnchecked());
+	UEdGraph* EdGraph = (OwningFlowGraphNode) ? OwningFlowGraphNode->GetGraph() : nullptr;
 
 	Super::BreakPinLinks(TargetPin, bSendsNodeNotification);
 
@@ -775,16 +784,30 @@ void UFlowGraphSchema::BreakPinLinks(UEdGraphPin& TargetPin, bool bSendsNodeNoti
 	{
 		if (OwningFlowGraphNode)
 		{
-			// this calls NotifyGraphChanged()
+			// this calls NotifyNodeChanged()
 			OwningFlowGraphNode->RemoveOrphanedPin(&TargetPin);
 		}
 	}
 	else if (bSendsNodeNotification)
 	{
-		UEdGraph* EdGraph = (OwningFlowGraphNode) ? OwningFlowGraphNode->GetGraph() : nullptr;
 		if (IsValid(EdGraph))
 		{
-			EdGraph->NotifyGraphChanged();
+			EdGraph->NotifyNodeChanged(OwningFlowGraphNode);
+		}
+	}
+
+	for (UEdGraphPin* OtherPin : CachedLinkedTo)
+	{
+		UFlowGraphNode* OtherOwningFlowGraphNode = Cast<UFlowGraphNode>(OtherPin->GetOwningNodeUnchecked());
+		
+		if (OtherPin->bOrphanedPin)
+		{
+			// this calls NotifyNodeChanged()
+			 OtherOwningFlowGraphNode->RemoveOrphanedPin(OtherPin);
+		}
+		else if (bSendsNodeNotification)
+		{
+			EdGraph->NotifyNodeChanged(OtherOwningFlowGraphNode);
 		}
 	}
 }
@@ -799,6 +822,8 @@ TSharedPtr<FEdGraphSchemaAction> UFlowGraphSchema::GetCreateCommentAction() cons
 	return TSharedPtr<FEdGraphSchemaAction>(static_cast<FEdGraphSchemaAction*>(new FFlowGraphSchemaAction_NewComment));
 }
 
+
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 void UFlowGraphSchema::OnPinConnectionDoubleCicked(UEdGraphPin* PinA, UEdGraphPin* PinB, const FVector2D& GraphPosition) const
 {
 	if (!FFlowPin::IsExecPinCategory(PinA->PinType.PinCategory) || !FFlowPin::IsExecPinCategory(PinB->PinType.PinCategory))
@@ -819,6 +844,88 @@ void UFlowGraphSchema::OnPinConnectionDoubleCicked(UEdGraphPin* PinA, UEdGraphPi
 	PinA->BreakLinkTo(PinB);
 	PinA->MakeLinkTo((PinA->Direction == EGPD_Output) ? NewReroute->InputPins[0] : NewReroute->OutputPins[0]);
 	PinB->MakeLinkTo((PinB->Direction == EGPD_Output) ? NewReroute->InputPins[0] : NewReroute->OutputPins[0]);
+}
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
+
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6
+void UFlowGraphSchema::OnPinConnectionDoubleCicked(UEdGraphPin* PinA, UEdGraphPin* PinB, const FVector2f& GraphPosition) const
+{
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		return OnPinConnectionDoubleCicked(PinA, PinB, FVector2D(GraphPosition));
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+}
+#endif
+
+bool UFlowGraphSchema::IsCacheVisualizationOutOfDate(int32 InVisualizationCacheID) const
+{
+	return CurrentCacheRefreshID != InVisualizationCacheID;
+}
+
+int32 UFlowGraphSchema::GetCurrentVisualizationCacheID() const
+{
+	return CurrentCacheRefreshID;
+}
+
+void UFlowGraphSchema::ForceVisualizationCacheClear() const
+{
+	++CurrentCacheRefreshID;
+}
+
+void UFlowGraphSchema::UpdateGeneratedDisplayNames()
+{
+	for (UClass* FlowNodeClass : NativeFlowNodes)
+	{
+		UpdateGeneratedDisplayName(FlowNodeClass, true);
+	}
+
+	for (UClass* FlowNodeAddOnClass : NativeFlowNodeAddOns)
+	{
+		UpdateGeneratedDisplayName(FlowNodeAddOnClass, true);
+	}
+
+	for (TPair<FName, FAssetData>& AssetData : BlueprintFlowNodes)
+	{
+		if (UBlueprint* Blueprint = Cast<UBlueprint>(AssetData.Value.GetAsset()))
+		{
+			UClass* NodeClass = Blueprint->GeneratedClass;
+			UpdateGeneratedDisplayName(NodeClass, true);
+		}
+	}
+
+	for (TPair<FName, FAssetData>& AssetData : BlueprintFlowNodeAddOns)
+	{
+		if (UBlueprint* Blueprint = Cast<UBlueprint>(AssetData.Value.GetAsset()))
+		{
+			UClass* NodeAddOnClass = Blueprint->GeneratedClass;
+			UpdateGeneratedDisplayName(NodeAddOnClass, true);
+		}
+	}
+	
+	OnNodeListChanged.Broadcast();
+
+	// Refresh node titles
+	GetDefault<UFlowGraphSchema>()->ForceVisualizationCacheClear();
+}
+
+void UFlowGraphSchema::UpdateGeneratedDisplayName(UClass* NodeClass, bool bBatch)
+{
+	static const FName NAME_GeneratedDisplayName("GeneratedDisplayName");
+
+	if (NodeClass->IsChildOf(UFlowNodeBase::StaticClass()) == false)
+	{
+		return;
+	}
+
+	FString NameWithoutPrefix = FFlowGraphUtils::RemovePrefixFromNodeText(NodeClass->GetDisplayNameText());
+	NodeClass->SetMetaData(NAME_GeneratedDisplayName, *NameWithoutPrefix);
+	
+	if (!bBatch)
+	{
+		OnNodeListChanged.Broadcast();
+
+		// Refresh node titles
+		GetDefault<UFlowGraphSchema>()->ForceVisualizationCacheClear();
+	}
 }
 
 bool UFlowGraphSchema::IsCacheVisualizationOutOfDate(int32 InVisualizationCacheID) const
@@ -1025,12 +1132,12 @@ void UFlowGraphSchema::GetFlowNodeActions(FGraphActionMenuBuilder& ActionMenuBui
 {
 	TArray<UFlowNodeBase*> FilteredNodes = GetFilteredPlaceableNodesOrAddOns(EditedFlowAsset, NativeFlowNodes, BlueprintFlowNodes);
 
-	for (const UFlowNodeBase* FlowNodeBase : FilteredNodes)
+	const UFlowGraphSettings& FlowGraphSettings = *UFlowGraphSettings::Get();
+	for (const UFlowNodeBase* FlowNode : FilteredNodes)
 	{
-		if ((CategoryName.IsEmpty() || CategoryName.Equals(FlowNodeBase->GetNodeCategory())) && !UFlowGraphSettings::Get()->NodesHiddenFromPalette.Contains(FlowNodeBase->GetClass()))
+		if ((CategoryName.IsEmpty() || CategoryName.Equals(FlowNode->GetNodeCategory())) && !FlowGraphSettings.NodesHiddenFromPalette.Contains(FlowNode->GetClass()))
 		{
-			const UFlowNode* FlowNode = CastChecked<UFlowNode>(FlowNodeBase);
-			TSharedPtr<FFlowGraphSchemaAction_NewNode> NewNodeAction(new FFlowGraphSchemaAction_NewNode(FlowNode));
+			TSharedPtr<FFlowGraphSchemaAction_NewNode> NewNodeAction(new FFlowGraphSchemaAction_NewNode(FlowNode, FlowGraphSettings));
 			ActionMenuBuilder.AddAction(NewNodeAction);
 		}
 	}

@@ -22,21 +22,9 @@ class UEdGraph;
 class UEdGraphNode;
 class UFlowAsset;
 
-#if WITH_EDITOR
-
-/** Interface for calling the graph editor methods */
-class FLOW_API IFlowGraphInterface
-{
-public:
-	IFlowGraphInterface() {}
-	virtual ~IFlowGraphInterface() {}
-
-	virtual void OnInputTriggered(UEdGraphNode* GraphNode, const int32 Index) const {}
-	virtual void OnOutputTriggered(UEdGraphNode* GraphNode, const int32 Index) const {}
-};
-
+#if !UE_BUILD_SHIPPING
 DECLARE_DELEGATE(FFlowGraphEvent);
-
+DECLARE_DELEGATE_TwoParams(FFlowSignalEvent, const FGuid& /*NodeGuid*/, const FName& /*PinName*/);
 #endif
 
 // Working Data struct for the Harvest Data Pins operation
@@ -97,7 +85,7 @@ public:
 	bool bWorldBound;
 
 //////////////////////////////////////////////////////////////////////////
-// Graph
+// Graph (editor-only)
 
 #if WITH_EDITOR
 public:	
@@ -109,12 +97,28 @@ public:
 	virtual void PostDuplicate(bool bDuplicateForPIE) override;
 	virtual void PostLoad() override;
 	// --
+#endif	
 
+#if WITH_EDITORONLY_DATA
 public:
 	FSimpleDelegate OnDetailsRefreshRequested;
 
 	static FString ValidationError_NodeClassNotAllowed;
 	static FString ValidationError_NullNodeInstance;
+
+private:
+	UPROPERTY()
+	TObjectPtr<UEdGraph> FlowGraph;
+#endif
+
+#if WITH_EDITOR
+public:
+	UEdGraph* GetGraph() const { return FlowGraph; }
+
+	virtual EDataValidationResult ValidateAsset(FFlowMessageLog& MessageLog);
+
+	// Returns whether the node class is allowed in this flow asset
+	bool IsNodeOrAddOnClassAllowed(const UClass* FlowNodeClass, FText* OutOptionalFailureReason = nullptr) const;
 
 	virtual EDataValidationResult ValidateAsset(FFlowMessageLog& MessageLog);
 
@@ -126,7 +130,7 @@ protected:
 	bool CanFlowAssetUseFlowNodeClass(const UClass& FlowNodeClass) const;
 	bool CanFlowAssetReferenceFlowNode(const UClass& FlowNodeClass, FText* OutOptionalFailureReason = nullptr) const;
 
-	bool IsFlowNodeClassInAllowedClasses(const UClass& FlowNodeClass, const TSubclassOf<UFlowNodeBase> RequiredAncestor = nullptr) const;
+	bool IsFlowNodeClassInAllowedClasses(const UClass& FlowNodeClass, const TSubclassOf<UFlowNodeBase>& RequiredAncestor = nullptr) const;
 	bool IsFlowNodeClassInDeniedClasses(const UClass& FlowNodeClass) const;
 #endif
 
@@ -193,8 +197,8 @@ public:
 	void RegisterNode(const FGuid& NewGuid, UFlowNode* NewNode);
 	void UnregisterNode(const FGuid& NodeGuid);
 
-	// Processes all nodes and creates map of all pin connections
-	void HarvestNodeConnections();
+	// Processes nodes and updates pin connections from the graph to the UFlowNode (processes all nodes in the graph if passed nullptr)
+	void HarvestNodeConnections(UFlowNode* TargetNode = nullptr);
 
 	// Updates the auto-generated pins and bindings for a given FlowNode,
 	// returns true if any changes were made.
@@ -297,7 +301,7 @@ protected:
 
 	void AddCustomOutput(const FName& EventName);
 	void RemoveCustomOutput(const FName& EventName);
-#endif // WITH_EDITOR
+#endif
 	
 //////////////////////////////////////////////////////////////////////////
 // Instances of the template asset
@@ -363,6 +367,7 @@ protected:
 	TMap<TWeakObjectPtr<UFlowNode_SubGraph>, TWeakObjectPtr<UFlowAsset>> ActiveSubGraphs;
 
 	// Optional entry points to the graph, similar to blueprint Custom Events
+	// Contains nodes only if it is initialized instance (see InitializeInstance, IsInstanceInitialized), empty otherwise
 	UPROPERTY()
 	TSet<TObjectPtr<UFlowNode_CustomInput>> CustomInputNodes;
 
@@ -380,8 +385,12 @@ protected:
 	EFlowFinishPolicy FinishPolicy;
 
 public:
-	virtual void InitializeInstance(const TWeakObjectPtr<UObject> InOwner, UFlowAsset* InTemplateAsset);
+	UE_DEPRECATED(5.4, "Use version that takes a UFlowAssetReference instead.")
+	virtual void InitializeInstance(const TWeakObjectPtr<UObject> InOwner, UFlowAsset* InTemplateAsset) { InitializeInstance(InOwner, *InTemplateAsset); }
+
+	virtual void InitializeInstance(const TWeakObjectPtr<UObject> InOwner, UFlowAsset& InTemplateAsset);
 	virtual void DeinitializeInstance();
+	bool IsInstanceInitialized() const { return IsValid(TemplateAsset); }
 
 	UFlowAsset* GetTemplateAsset() const { return TemplateAsset; }
 
@@ -423,6 +432,11 @@ protected:
 	void FinishNode(UFlowNode* Node);
 	void ResetNodes();
 
+#if !UE_BUILD_SHIPPING
+public:	
+	FFlowSignalEvent OnPinTriggered;
+#endif
+	
 public:
 	UFlowSubsystem* GetFlowSubsystem() const;
 	FName GetDisplayName() const;
