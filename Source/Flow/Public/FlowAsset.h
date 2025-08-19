@@ -106,7 +106,9 @@ public:
 	static FString ValidationError_NodeClassNotAllowed;
 	static FString ValidationError_NullNodeInstance;
 
-private:
+// #ARKREP_MODIFIED_CODE : made 'FlowGraph' protected (previously private)
+//private:
+protected:
 	UPROPERTY()
 	TObjectPtr<UEdGraph> FlowGraph;
 #endif
@@ -114,11 +116,6 @@ private:
 #if WITH_EDITOR
 public:
 	UEdGraph* GetGraph() const { return FlowGraph; }
-
-	virtual EDataValidationResult ValidateAsset(FFlowMessageLog& MessageLog);
-
-	// Returns whether the node class is allowed in this flow asset
-	bool IsNodeOrAddOnClassAllowed(const UClass* FlowNodeClass, FText* OutOptionalFailureReason = nullptr) const;
 
 	virtual EDataValidationResult ValidateAsset(FFlowMessageLog& MessageLog);
 
@@ -133,27 +130,6 @@ protected:
 	bool IsFlowNodeClassInAllowedClasses(const UClass& FlowNodeClass, const TSubclassOf<UFlowNodeBase>& RequiredAncestor = nullptr) const;
 	bool IsFlowNodeClassInDeniedClasses(const UClass& FlowNodeClass) const;
 #endif
-
-	// IFlowGraphInterface
-#if WITH_EDITORONLY_DATA
-	
-// #ARKREP_MODIFIED_CODE : made 'FlowGraph' protected (previously private)
-//private:
-protected:
-	UPROPERTY()
-	TObjectPtr<UEdGraph> FlowGraph;
-
-	static TSharedPtr<IFlowGraphInterface> FlowGraphInterface;
-#endif
-
-public:
-#if WITH_EDITOR
-	UEdGraph* GetGraph() const { return FlowGraph; };
-
-	static void SetFlowGraphInterface(TSharedPtr<IFlowGraphInterface> InFlowAssetEditor);
-	static TSharedPtr<IFlowGraphInterface> GetFlowGraphInterface() { return FlowGraphInterface; };
-#endif
-	// -- 
 
 //////////////////////////////////////////////////////////////////////////
 // Nodes
