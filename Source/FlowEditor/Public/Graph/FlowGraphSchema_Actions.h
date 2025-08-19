@@ -94,45 +94,6 @@ struct FLOWEDITOR_API FFlowSchemaAction_NewSubNode : public FEdGraphSchemaAction
 	static TSharedPtr<FFlowSchemaAction_NewSubNode> AddNewSubNodeAction(FGraphActionListBuilderBase& ContextMenuBuilder, const FText& Category, const FText& MenuDesc, const FText& Tooltip);
 };
 
-/** Action to add a subnode to the selected node */
-USTRUCT()
-struct FLOWEDITOR_API FFlowSchemaAction_NewSubNode : public FEdGraphSchemaAction
-{
-	GENERATED_USTRUCT_BODY();
-
-	/** Template of node we want to create */
-	UPROPERTY()
-	TObjectPtr<UFlowGraphNode> NodeTemplate;
-
-	/** parent node */
-	UPROPERTY()
-	TObjectPtr<UFlowGraphNode> ParentNode;
-
-	FFlowSchemaAction_NewSubNode()
-		: FEdGraphSchemaAction()
-		, NodeTemplate(nullptr)
-		, ParentNode(nullptr)
-	{
-	}
-
-	FFlowSchemaAction_NewSubNode(FText InNodeCategory, FText InMenuDesc, FText InToolTip, const int32 InGrouping)
-		: FEdGraphSchemaAction(MoveTemp(InNodeCategory), MoveTemp(InMenuDesc), MoveTemp(InToolTip), InGrouping)
-		, NodeTemplate(nullptr)
-		, ParentNode(nullptr)
-	{
-	}
-
-	// FEdGraphSchemaAction
-	virtual UEdGraphNode* PerformAction(class UEdGraph* ParentGraph, UEdGraphPin* FromPin, const FVector2D Location, bool bSelectNewNode = true) override;
-	virtual UEdGraphNode* PerformAction(class UEdGraph* ParentGraph, TArray<UEdGraphPin*>& FromPins, const FVector2D Location, bool bSelectNewNode = true) override;
-	virtual void AddReferencedObjects(FReferenceCollector& Collector) override;
-	// --
-
-	static UFlowGraphNode* RecreateNode(UEdGraph* ParentGraph, UEdGraphNode* OldInstance, UFlowGraphNode* ParentFlowGraphNode, UFlowNodeAddOn* FlowNodeAddOn);
-
-	static TSharedPtr<FFlowSchemaAction_NewSubNode> AddNewSubNodeAction(FGraphActionListBuilderBase& ContextMenuBuilder, const FText& Category, const FText& MenuDesc, const FText& Tooltip);
-};
-
 /** Action to paste clipboard contents into the graph */
 USTRUCT()
 struct FLOWEDITOR_API FFlowGraphSchemaAction_Paste : public FEdGraphSchemaAction
