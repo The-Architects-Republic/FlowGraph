@@ -879,6 +879,7 @@ void UFlowNode::TriggerOutput(const FName PinName, const bool bFinish /*= false*
 		}
 
 // #ARKREP_MODIFIED_CODE : Added 'Non-executable nodes' related code
+#if WITH_EDITOR
 		if (GEditor != nullptr)
 		{
 			/* If the node has terminated (finish) and has more than one output, we will check its connected nodes
@@ -888,6 +889,7 @@ void UFlowNode::TriggerOutput(const FName PinName, const bool bFinish /*= false*
 				MarkOutputNodesAsNonExecutableInPIE(OutputPins.IndexOfByKey(PinName));
 			}
 		}
+#endif
 // !#ARKREP_MODIFIED_CODE
 	}
 	else

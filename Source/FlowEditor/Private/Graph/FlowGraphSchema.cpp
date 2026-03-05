@@ -774,12 +774,6 @@ void UFlowGraphSchema::BreakPinLinks(UEdGraphPin& TargetPin, bool bSendsNodeNoti
 
 	Super::BreakPinLinks(TargetPin, bSendsNodeNotification);
 
-	// Cache the owning node because calling Super::BreakPinLinks might release the pointer
-	// to the pin owning node as a side effect of notify graph changed events. 
-	UFlowGraphNode* OwningFlowGraphNode = Cast<UFlowGraphNode>(TargetPin.GetOwningNodeUnchecked());
-
-	// NOTE (gtaylor) It is possible for OwningFlowGraphNode to be null if the TargetPin has been orphaned.
-
 	if (TargetPin.bOrphanedPin)
 	{
 		if (OwningFlowGraphNode)
@@ -855,78 +849,6 @@ void UFlowGraphSchema::OnPinConnectionDoubleCicked(UEdGraphPin* PinA, UEdGraphPi
 	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 }
 #endif
-
-bool UFlowGraphSchema::IsCacheVisualizationOutOfDate(int32 InVisualizationCacheID) const
-{
-	return CurrentCacheRefreshID != InVisualizationCacheID;
-}
-
-int32 UFlowGraphSchema::GetCurrentVisualizationCacheID() const
-{
-	return CurrentCacheRefreshID;
-}
-
-void UFlowGraphSchema::ForceVisualizationCacheClear() const
-{
-	++CurrentCacheRefreshID;
-}
-
-void UFlowGraphSchema::UpdateGeneratedDisplayNames()
-{
-	for (UClass* FlowNodeClass : NativeFlowNodes)
-	{
-		UpdateGeneratedDisplayName(FlowNodeClass, true);
-	}
-
-	for (UClass* FlowNodeAddOnClass : NativeFlowNodeAddOns)
-	{
-		UpdateGeneratedDisplayName(FlowNodeAddOnClass, true);
-	}
-
-	for (TPair<FName, FAssetData>& AssetData : BlueprintFlowNodes)
-	{
-		if (UBlueprint* Blueprint = Cast<UBlueprint>(AssetData.Value.GetAsset()))
-		{
-			UClass* NodeClass = Blueprint->GeneratedClass;
-			UpdateGeneratedDisplayName(NodeClass, true);
-		}
-	}
-
-	for (TPair<FName, FAssetData>& AssetData : BlueprintFlowNodeAddOns)
-	{
-		if (UBlueprint* Blueprint = Cast<UBlueprint>(AssetData.Value.GetAsset()))
-		{
-			UClass* NodeAddOnClass = Blueprint->GeneratedClass;
-			UpdateGeneratedDisplayName(NodeAddOnClass, true);
-		}
-	}
-	
-	OnNodeListChanged.Broadcast();
-
-	// Refresh node titles
-	GetDefault<UFlowGraphSchema>()->ForceVisualizationCacheClear();
-}
-
-void UFlowGraphSchema::UpdateGeneratedDisplayName(UClass* NodeClass, bool bBatch)
-{
-	static const FName NAME_GeneratedDisplayName("GeneratedDisplayName");
-
-	if (NodeClass->IsChildOf(UFlowNodeBase::StaticClass()) == false)
-	{
-		return;
-	}
-
-	FString NameWithoutPrefix = FFlowGraphUtils::RemovePrefixFromNodeText(NodeClass->GetDisplayNameText());
-	NodeClass->SetMetaData(NAME_GeneratedDisplayName, *NameWithoutPrefix);
-	
-	if (!bBatch)
-	{
-		OnNodeListChanged.Broadcast();
-
-		// Refresh node titles
-		GetDefault<UFlowGraphSchema>()->ForceVisualizationCacheClear();
-	}
-}
 
 bool UFlowGraphSchema::IsCacheVisualizationOutOfDate(int32 InVisualizationCacheID) const
 {

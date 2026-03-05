@@ -20,6 +20,7 @@
 #include "Developer/ToolMenus/Public/ToolMenus.h"
 #include "DiffResults.h"
 #include "Editor.h"
+#include "FlowEditorStyle.h"
 #include "FlowLogChannels.h"
 #include "Framework/Commands/GenericCommands.h"
 #include "GraphDiffControl.h"
@@ -1691,7 +1692,9 @@ bool UFlowGraphNode::IsNonExecutableInPIE() const
 		if (const UFlowNode* inspectedInstance = flowNode->GetInspectedInstance())
 			return inspectedInstance->IsNonExecutableInPIE();
 	}
+	return false;
 }
+
 // !#ARKREP_MODIFIED_CODE
 
 bool UFlowGraphNode::CanReconstructNode() const

@@ -120,8 +120,6 @@ protected:
 
 	static bool ArePinCategoriesEffectivelyMatching(const FName& InputPinCategory, const FName& OutputPinCategory, bool bAllowImplicitCasts = true);
 
-	static bool ArePinCategoriesEffectivelyMatching(const FName& InputPinCategory, const FName& OutputPinCategory, bool bAllowImplicitCasts = true);
-
 private:
 	static void ApplyNodeOrAddOnFilter(const UFlowAsset* AssetClassDefaults, const UClass* FlowNodeClass, TArray<UFlowNodeBase*>& FilteredNodes);
 	static void GetFlowNodeActions(FGraphActionMenuBuilder& ActionMenuBuilder, const UFlowAsset* EditedFlowAsset, const FString& CategoryName);
