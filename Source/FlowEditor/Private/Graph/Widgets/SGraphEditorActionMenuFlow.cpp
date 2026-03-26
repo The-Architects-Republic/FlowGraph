@@ -9,6 +9,7 @@
 #include "HAL/PlatformCrt.h"
 #include "Layout/Margin.h"
 #include "Misc/Attribute.h"
+#include "Runtime/Launch/Resources/Version.h"
 #include "SGraphActionMenu.h"
 #include "Styling/AppStyle.h"
 #include "Templates/Casts.h"
@@ -92,11 +93,7 @@ void SGraphEditorActionMenuFlow::OnActionSelected(const TArray<TSharedPtr<FEdGra
 
 				if (CurrentAction.IsValid())
 				{
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION < 6
-					CurrentAction->PerformAction(GraphObj, DraggedFromPins, FVector2D(NewNodePosition));
-#else
 					CurrentAction->PerformAction(GraphObj, DraggedFromPins, NewNodePosition);
-#endif
 					bDoDismissMenus = true;
 				}
 			}

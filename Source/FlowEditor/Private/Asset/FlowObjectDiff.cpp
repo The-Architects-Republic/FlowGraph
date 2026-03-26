@@ -1,15 +1,14 @@
-// Copyright https://github.com/MothCocoon/FlowGraph/graphs/contributors
+﻿// Copyright https://github.com/MothCocoon/FlowGraph/graphs/contributors
 
 #include "Asset/FlowObjectDiff.h"
 
 #include "Asset/FlowDiffControl.h"
 #include "Nodes/FlowNodeBase.h"
-#include "EdGraph/EdGraph.h"
-
 #include "Graph/Nodes/FlowGraphNode.h"
-#include "SBlueprintDiff.h"
 
 #include "DiffResults.h"
+#include "EdGraph/EdGraph.h"
+#include "SBlueprintDiff.h"
 
 /////////////////////////////////////////////////////////////////////////////
 /// FFlowNodePropertyDiff
@@ -51,19 +50,11 @@ void FFlowObjectDiff::InitializeDetailsDiffFromNode(UEdGraphNode* Node, const UO
 
 	if (NodeDiffType == ENodeDiffType::Old && !OldDetailsView.IsValid())
 	{
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION < 6
-		OldDetailsView = MakeShared<FDetailsDiff>(Object, FOnDisplayedPropertiesChanged());
-#else
 		OldDetailsView = MakeShared<FDetailsDiff>(Object);
-#endif
 	}
 	else if (NodeDiffType == ENodeDiffType::New && !NewDetailsView.IsValid())
 	{
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION < 6		
-		NewDetailsView = MakeShared<FDetailsDiff>(Object, FOnDisplayedPropertiesChanged());
-#else
 		NewDetailsView = MakeShared<FDetailsDiff>(Object);
-#endif
 	}
 }
 

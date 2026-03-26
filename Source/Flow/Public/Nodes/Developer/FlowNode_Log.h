@@ -1,11 +1,12 @@
 // Copyright https://github.com/MothCocoon/FlowGraph/graphs/contributors
-
 #pragma once
 
-#include "Nodes/FlowNode.h"
+#include "Nodes/Graph/FlowNode_DefineProperties.h"
 #include "FlowNode_Log.generated.h"
 
-// Variant of ELogVerbosity
+/**
+ * Variant of ELogVerbosity.
+ */
 UENUM(BlueprintType)
 enum class EFlowLogVerbosity : uint8
 {
@@ -22,13 +23,16 @@ enum class EFlowLogVerbosity : uint8
  * Optionally shows message on screen
  */
 UCLASS(NotBlueprintable, meta = (DisplayName = "Log", Keywords = "print"))
-class FLOW_API UFlowNode_Log : public UFlowNode
+class FLOW_API UFlowNode_Log : public UFlowNode_DefineProperties
 {
-	GENERATED_UCLASS_BODY()
-	
+	GENERATED_BODY()
+
+public:
+	UFlowNode_Log();
+
 private:
-	// The message to write to the log
-	// (if the Message input pin is not connected to another source)
+	/* The message to write to the log.
+	 * If the Message input pin is not connected to another source. */
 	UPROPERTY(EditAnywhere, Category = "Flow", meta = (DefaultForInputFlowPin, FlowPinType = String))
 	FString Message;
 
@@ -45,10 +49,23 @@ private:
 	FColor TextColor;
 
 protected:
+	// IFlowCoreExecutableInterface
 	virtual void ExecuteInput(const FName& PinName) override;
+	// --
 
 #if WITH_EDITOR
 public:
+	// UObject
+	virtual void PostEditChangeChainProperty(FPropertyChangedChainEvent& PropertyChangedEvent) override;
+	// --
+
+	// UFlowNodeBase
+	virtual void OnEditorPinConnectionsChanged(const TArray<FFlowPinConnectionChange>& Changes) override;
+	// --
+
 	virtual void UpdateNodeConfigText_Implementation() override;
 #endif
+
+public:
+	EFlowLogVerbosity GetVerbosity() const { return Verbosity; }
 };
