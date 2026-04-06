@@ -3,7 +3,8 @@
 
 #include "IDetailCustomization.h"
 
-class FFlowNode_SubGraphDetails final : public IDetailCustomization
+// #ARKREP_MODIFIED_CODE : Added export macro + Removed final so our code is still compatible (maybe it should change?)
+class FLOWEDITOR_API FFlowNode_SubGraphDetails : public IDetailCustomization
 {
 public:
 	static TSharedRef<IDetailCustomization> MakeInstance()

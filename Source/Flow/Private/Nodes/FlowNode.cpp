@@ -1377,7 +1377,7 @@ void UFlowNode::MarkOutputNodesAsNonExecutableInPIE(const int32 executedOutputIn
 	// Gather all connected output nodes
 	for (const FFlowPin& pin : OutputPins)
 	{
-		if (pin.GetPinType() == EFlowPinType::Exec)
+		if (pin.PinType == EFlowPinType::Exec)
 		{
 			const FConnectedPin connection = GetConnection(pin.PinName);
 			if (connection.NodeGuid.IsValid())
