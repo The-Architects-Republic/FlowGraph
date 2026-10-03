@@ -1,6 +1,7 @@
 // Copyright https://github.com/MothCocoon/FlowGraph/graphs/contributors
 #pragma once
 
+#include "Interfaces/FlowPreloadableInterface.h"
 #include "Nodes/FlowNode.h"
 #include "Types/FlowActorOwnerComponentRef.h"
 #include "Types/FlowEnumUtils.h"
@@ -29,14 +30,16 @@ FLOW_ENUM_RANGE_VALUES(EExecuteComponentSource)
 
 namespace EExecuteComponentSource_Classifiers
 {
-	FORCEINLINE bool DoesComponentSourceUseInjectManager(EExecuteComponentSource Source) { return FLOW_IS_ENUM_IN_SUBRANGE(Source, EExecuteComponentSource::UsesInjectManager); }
+	FORCEINLINE bool DoesComponentSourceUseInjectManager(const EExecuteComponentSource Source) { return FLOW_IS_ENUM_IN_SUBRANGE(Source, EExecuteComponentSource::UsesInjectManager); }
 }
 
 /**
  * Execute a UActorComponent on the owning actor as if it was a flow subgraph.
  */
 UCLASS(NotBlueprintable, meta = (DisplayName = "Execute Component"))
-class FLOW_API UFlowNode_ExecuteComponent : public UFlowNode
+class FLOW_API UFlowNode_ExecuteComponent
+	: public UFlowNode
+	, public IFlowPreloadableInterface
 {
 	GENERATED_BODY()
 
@@ -46,12 +49,15 @@ public:
 	// IFlowCoreExecutableInterface
 	virtual void InitializeInstance() override;
 	virtual void DeinitializeInstance() override;
-	virtual void PreloadContent() override;
-	virtual void FlushContent() override;
 	virtual void OnActivate() override;
 	virtual void Cleanup() override;
 	virtual void ForceFinishNode() override;
 	virtual void ExecuteInput(const FName& PinName) override;
+	// --
+
+	// IFlowPreloadableInterface
+	virtual EFlowPreloadResult PreloadContent() override;
+	virtual void FlushContent() override;
 	// --
 
 	// UFlowNodeBase
@@ -84,7 +90,7 @@ public:
 	
 protected:
 #if WITH_EDITOR
-	void RefreshPins();
+	void RefreshPins() const;
 	const UActorComponent* TryGetExpectedComponent() const;
 
 	void RefreshComponentSource();

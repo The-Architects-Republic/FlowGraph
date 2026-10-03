@@ -3,6 +3,7 @@
 
 #include "EdGraph/EdGraphNode.h"
 #include "GameplayTagContainer.h"
+#include "StructUtils/InstancedStruct.h"
 #include "UObject/TextProperty.h"
 #include "VisualLogger/VisualLoggerDebugSnapshotInterface.h"
 
@@ -19,6 +20,8 @@
 
 #include "FlowNode.generated.h"
 
+struct FFlowNodeSaveData;
+struct FFlowPreloadHelper;
 
 /**
  * A Flow Node is UObject-based node designed to handle entire gameplay feature within single node.
@@ -108,12 +111,12 @@ public:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "FlowNode")
-	TArray<EFlowSignalMode> AllowedSignalModes;
+	TArray<EFlowSignalMode> AllowedSignalModes = {EFlowSignalMode::Enabled, EFlowSignalMode::Disabled, EFlowSignalMode::PassThrough};
 
 	/* If enabled, signal will pass through node without calling ExecuteInput().
 	 * Designed to handle patching already released games. */
 	UPROPERTY()
-	EFlowSignalMode SignalMode;
+	EFlowSignalMode SignalMode = EFlowSignalMode::Enabled;
 
 // #ARKREP_MODIFIED_CODE : Added 'start here' and metadata related variable
 protected:
@@ -162,7 +165,10 @@ protected:
 	uint8 CountNumberedOutputs() const;
 
 public:
+	UFUNCTION(BlueprintPure, Category = "FlowNode")
 	const TArray<FFlowPin>& GetInputPins() const { return InputPins; }
+
+	UFUNCTION(BlueprintPure, Category = "FlowNode")
 	const TArray<FFlowPin>& GetOutputPins() const { return OutputPins; }
 
 	UFUNCTION(BlueprintPure, Category = "FlowNode")
@@ -304,11 +310,11 @@ public:
 
 	// IFlowDataPinValueSupplierInterface
 public:
-	virtual FFlowDataPinResult TrySupplyDataPin(FName PinName) const override;
+	virtual FFlowDataPinResult TrySupplyDataPin(const FName PinName) const override;
 
 protected:
 	/* Helper for TryGetFlowDataPinSupplierDatasForPinName(). */
-	void TryAddSupplierDataToArray(FFlowPinValueSupplierData& InOutSupplierData, TFlowPinValueSupplierDataArray& InOutPinValueSupplierDatas) const;
+	static void TryAddSupplierDataToArray(const FFlowPinValueSupplierData& InOutSupplierData, TFlowPinValueSupplierDataArray& InOutPinValueSupplierDatas);
 
 public:
 	/* Advanced helper for TrySupplyDataPin, which can be overridden in subclasses to provide additional or replacement object(s)
@@ -353,11 +359,18 @@ protected:
 // Executing node instance
 
 public:
-	bool bPreloaded;
+	// IFlowCoreExecutableInterface
+	virtual void InitializeInstance() override;
+	virtual void DeinitializeInstance() override;
+
+	virtual void OnActivate() override;
+	virtual void Cleanup() override;
+	virtual void ExecuteInput(const FName& PinName) override;
+	// --
 
 protected:
 	UPROPERTY(SaveGame)
-	EFlowNodeState ActivationState;
+	EFlowNodeState ActivationState = EFlowNodeState::NeverActivated;
 
 public:
 	EFlowNodeState GetActivationState() const { return ActivationState; }
@@ -369,10 +382,6 @@ protected:
 	TMap<FName, TArray<FPinRecord>> InputRecords;
 	TMap<FName, TArray<FPinRecord>> OutputRecords;
 #endif
-
-public:
-	void TriggerPreload();
-	void TriggerFlush();
 
 protected:
 	/* Trigger execution of input pin. */
@@ -416,6 +425,36 @@ protected:
 
 #endif // WITH_EDITOR
 // !#ARKREP_MODIFIED_CODE
+
+//////////////////////////////////////////////////////////////////////////
+// Preload Content (subclasses must implement IFlowPreloadableInterface to use this code)
+
+public:
+	/* Called by FFlowPreloadHelper at policy-determined lifecycle points, and directly by callers for ManualOnly timing. */
+	void TriggerPreload();
+	void TriggerFlush();
+
+	/* Returns true if this node's content is currently preloaded. */
+	bool IsContentPreloaded() const;
+
+	/* Called when async preloading finishes (i.e. PreloadContent returned PreloadInProgress). Updates helper state and fires "Preloaded" output.
+	 * Async C++ nodes call this from their completion delegate; async Blueprint nodes call it on self.
+	 * Safe to call from within PreloadContent() (e.g. if FStreamableManager fires synchronously).
+	 * Must be called on the game thread. No-op if called after TriggerFlush (cancellation guard). */
+	UFUNCTION(BlueprintCallable, Category = "Preload Content")
+	void NotifyPreloadComplete();
+
+protected:
+	/* Instanced preload helper allocated at InitializeInstance for nodes implementing IFlowPreloadableInterface.
+	 * Remains uninitialized (invalid) for non-preloadable nodes. */
+	UPROPERTY(Transient)
+	TInstancedStruct<FFlowPreloadHelper> PreloadHelper;
+
+	bool TryInitializePreloadHelper();
+	void DeinitializePreloadHelper();
+
+	/* Forwards PinName to the PreloadHelper if one exists. Returns true if the helper consumed the pin. */
+	bool DispatchExecuteInputToPreloadHelper(const FName& PinName);
 
 //////////////////////////////////////////////////////////////////////////
 // SaveGame support

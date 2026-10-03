@@ -1,5 +1,4 @@
 // Copyright https://github.com/MothCocoon/FlowGraph/graphs/contributors
-
 #include "Graph/Nodes/FlowGraphNode.h"
 
 #include "FlowAsset.h"
@@ -9,6 +8,7 @@
 #include "Debugger/FlowDebuggerSubsystem.h"
 
 #include "FlowEditorCommands.h"
+#include "FlowLogChannels.h"
 #include "Graph/FlowGraph.h"
 #include "Graph/FlowGraphEditorSettings.h"
 #include "Graph/FlowGraphSchema.h"
@@ -24,7 +24,7 @@
 #include "DiffResults.h"
 #include "Editor.h"
 #include "FlowEditorStyle.h"
-#include "FlowLogChannels.h"
+#include "Editor/Transactor.h"
 #include "Framework/Commands/GenericCommands.h"
 #include "GraphDiffControl.h"
 #include "GraphEditorActions.h"
@@ -35,19 +35,12 @@
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "Textures/SlateIcon.h"
 #include "ToolMenuSection.h"
-#include "Editor/Transactor.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(FlowGraphNode)
 
 #define LOCTEXT_NAMESPACE "FlowGraphNode"
 
-UFlowGraphNode::UFlowGraphNode(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
-	, NodeInstance(nullptr)
-	, bBlueprintCompilationPending(false)
-	, bIsReconstructingNode(false)
-	, bIsDestroyingNode(false)
-	, bNeedsFullReconstruction(false)
+UFlowGraphNode::UFlowGraphNode()
 {
 	OrphanedPinSaveMode = ESaveOrphanPinMode::SaveAll;
 }
@@ -123,7 +116,7 @@ void UFlowGraphNode::PostEditImport()
 
 	// Reset the owning graph after an edit import
 	ResetNodeOwner();
-
+	UpdateNodeClassData();
 	if (NodeInstance)
 	{
 		InitializeInstance();
@@ -186,7 +179,7 @@ void UFlowGraphNode::PostCopyNode()
 		if (NodeInstance->GetOuter() != FlowAsset)
 		{
 			// Ensures NodeInstance is owned by the FlowAsset
-			NodeInstance->Rename(nullptr, FlowAsset, REN_DontCreateRedirectors);
+			NodeInstance->Rename(nullptr, FlowAsset, REN_DontCreateRedirectors | REN_DoNotDirty);
 		}
 
 		NodeInstance->SetGraphNode(this);
@@ -826,7 +819,7 @@ FFlowNodeEditorMetaData* UFlowGraphNode::GetEditorMetadata() const
 	return nullptr;
 }
 
-// !#ARKREP_MODIFIED_CODE 
+// !#ARKREP_MODIFIED_CODE
 
 bool UFlowGraphNode::IsContentPreloaded() const
 {
@@ -834,7 +827,7 @@ bool UFlowGraphNode::IsContentPreloaded() const
 	{
 		if (const UFlowNode* InspectedInstance = FlowNode->GetInspectedInstance())
 		{
-			return InspectedInstance->bPreloaded;
+			return InspectedInstance->IsContentPreloaded();
 		}
 	}
 
@@ -1235,7 +1228,7 @@ void UFlowGraphNode::SetSignalMode(const EFlowSignalMode Mode)
 		FlowNode->Modify();
 		FlowNode->SignalMode = Mode;
 
-// #ARKREP_MODIFIED_CODE : Cancel start here if the node is disabled 
+// #ARKREP_MODIFIED_CODE : Cancel start here if the node is disabled
 		if (Mode == EFlowSignalMode::Disabled)
 			FlowNode->GraphStartHere = false;
 // !#ARKREP_MODIFIED_CODE
@@ -1314,7 +1307,7 @@ void UFlowGraphNode::CancelStartHere() const
 {
 	if (!CanSetCancelStartHere())
 		return;
-	
+
 	if (UFlowNode* FlowNode = Cast<UFlowNode>(NodeInstance))
 	{
 		FlowNode->GraphStartHere = false;

@@ -34,6 +34,14 @@ public:
 	friend class UFlowComponent;
 	friend class UFlowNode_SubGraph;
 
+	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
+	virtual UWorld* GetWorld() const override;
+	
+	virtual void Deinitialize() override;
+
+//////////////////////////////////////////////////////////////////////////
+// Lifetime cycle of Flow Asset instances
+	
 protected:
 	/* All asset templates with active instances */
 	UPROPERTY()
@@ -57,16 +65,7 @@ public:
 	static FNativeFlowAssetEvent OnInstancedTemplateRemoved;
 #endif
 
-protected:
-	UPROPERTY()
-	TObjectPtr<UFlowSaveGame> LoadedSaveGame;
-
 public:
-	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
-
-	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
-	virtual void Deinitialize() override;
-
 	UFUNCTION(BlueprintCallable, Category = "FlowSubsystem")
 	virtual void AbortActiveFlows();
 
@@ -123,19 +122,27 @@ public:
 	UFUNCTION(BlueprintPure, Category = "FlowSubsystem")
 	const TMap<UFlowNode_SubGraph*, UFlowAsset*>& GetInstancedSubFlows() const { return ObjectPtrDecay(InstancedSubFlows); }
 
-	virtual UWorld* GetWorld() const override;
 
 //////////////////////////////////////////////////////////////////////////
 // SaveGame support
 
+protected:
+	UPROPERTY(Transient)
+	TObjectPtr<UFlowSaveGame> LoadedSaveGame;
+
+public:
 	UPROPERTY(BlueprintAssignable, Category = "FlowSubsystem")
 	FSimpleFlowEvent OnSaveGame;
 
 	UFUNCTION(BlueprintCallable, Category = "FlowSubsystem")
 	virtual void OnGameSaved(UFlowSaveGame* SaveGame);
 
+	virtual void OnGameSaved(TArray<FFlowComponentSaveData>& FlowComponents, TArray<FFlowAssetSaveData>& FlowInstances);
+
 	UFUNCTION(BlueprintCallable, Category = "FlowSubsystem")
 	virtual void OnGameLoaded(UFlowSaveGame* SaveGame);
+
+	virtual void OnGameLoaded(TArray<FFlowComponentSaveData>& FlowComponents, TArray<FFlowAssetSaveData>& FlowInstances);
 
 	UFUNCTION(BlueprintCallable, Category = "FlowSubsystem")
 	virtual void LoadRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const FString& SavedAssetInstanceName, const bool bAllowMultipleInstances);
@@ -145,6 +152,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "FlowSubsystem")
 	UFlowSaveGame* GetLoadedSaveGame() const { return LoadedSaveGame; }
+
+	virtual const FFlowComponentSaveData* GetLoadedComponentRecord(const UFlowComponent* Component) const;
+	virtual const FFlowAssetSaveData* GetLoadedAssetRecord(const UObject* Owner, const UFlowAsset* Asset, const FString& SavedAssetInstanceName) const;
+
+	UFUNCTION(BlueprintCallable, Category = "FlowSubsystem")
+	virtual void ClearLoadedSaveGame();
 
 //////////////////////////////////////////////////////////////////////////
 // Component Registry

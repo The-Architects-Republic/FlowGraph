@@ -28,7 +28,10 @@ DECLARE_DELEGATE(FFlowGraphNodeEvent);
 UCLASS()
 class FLOWEDITOR_API UFlowGraphNode : public UEdGraphNode
 {
-	GENERATED_UCLASS_BODY()
+	GENERATED_BODY()
+
+public:
+	UFlowGraphNode();
 
 //////////////////////////////////////////////////////////////////////////
 // Flow node
@@ -38,10 +41,10 @@ protected:
 	UPROPERTY(Instanced)
 	TObjectPtr<UFlowNodeBase> NodeInstance;
 
-	bool bBlueprintCompilationPending;
-	bool bIsReconstructingNode;
-	bool bIsDestroyingNode;
-	bool bNeedsFullReconstruction;
+	bool bBlueprintCompilationPending = false;
+	bool bIsReconstructingNode = false;
+	bool bIsDestroyingNode = false;
+	bool bNeedsFullReconstruction = false;
 	static bool bFlowAssetsLoaded;
 
 public:
@@ -49,7 +52,7 @@ public:
 	 * However, we shouldn't assign class from editor module to runtime module class. */
 	UPROPERTY()
 	TArray<TSubclassOf<UFlowNodeBase>> AssignedNodeClasses;
-	
+
 	void SetNodeTemplate(UFlowNodeBase* InNodeInstance);
 	const UFlowNodeBase* GetNodeTemplate() const;
 
@@ -65,8 +68,8 @@ public:
 	virtual void PostPlacedNewNode() override;
 	virtual void PrepareForCopying() override;
 	virtual void PostPasteNode() override;
-    // --
-	
+	// --
+
 	void PostCopyNode();
 
 private:
@@ -111,7 +114,7 @@ public:
 	virtual void GetNodeContextMenuActions(class UToolMenu* Menu, class UGraphNodeContextMenuContext* Context) const override;
 	virtual bool CanUserDeleteNode() const override;
 	virtual bool CanDuplicateNode() const override;
-	virtual bool CanPasteHere( const UEdGraph* TargetGraph ) const override;
+	virtual bool CanPasteHere(const UEdGraph* TargetGraph) const override;
 	virtual TSharedPtr<SGraphNode> CreateVisualWidget() override;
 	virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
 	virtual FLinearColor GetNodeTitleColor() const override;
@@ -161,6 +164,7 @@ public:
 	// --
 
 	virtual void OnNodeDoubleClicked() const;
+
 	virtual void OnNodeDoubleClickedInPIE() const {}
 
 	/* Check if node has any errors, used for assigning colors on graph. */
@@ -184,10 +188,10 @@ public:
 
 protected:
 	bool CanReconstructNode() const;
-	
+
 	bool TryUpdateNodePins() const;
 	bool CheckGraphPinsMatchNodePins() const;
-	
+
 //////////////////////////////////////////////////////////////////////////
 // Pins
 
@@ -231,7 +235,7 @@ public:
 public:
 	FFlowGraphNodeEvent OnSignalModeChanged;
 	FFlowGraphNodeEvent OnReconstructNodeCompleted;
-	
+
 	/* Pin activation forced by user during PIE. */
 	virtual void ForcePinActivation(const FEdGraphPinReference PinReference) const;
 
@@ -279,7 +283,7 @@ public:
 
 	void RebuildRuntimeAddOnsFromEditorSubNodes(bool bForceReconstructNode = true);
 
-	static void DiffSubNodes(const FText& NodeTypeDisplayName, const TArray<UFlowGraphNode*>& LhsSubNodes,	const TArray<UFlowGraphNode*>& RhsSubNodes,	FDiffResults& Results);
+	static void DiffSubNodes(const FText& NodeTypeDisplayName, const TArray<UFlowGraphNode*>& LhsSubNodes, const TArray<UFlowGraphNode*>& RhsSubNodes, FDiffResults& Results);
 
 	// UObject
 #if WITH_EDITOR
@@ -301,9 +305,9 @@ public:
 
 	virtual int32 FindSubNodeDropIndex(UFlowGraphNode* SubNode) const;
 	virtual void InsertSubNodeAt(UFlowGraphNode* SubNode, const int32 DropIndex);
-	
+
 	virtual bool IsSubNode() const;
-	
+
 	virtual void InitializeInstance();
 	virtual bool RefreshNodeClass();
 	virtual void UpdateNodeClassData();

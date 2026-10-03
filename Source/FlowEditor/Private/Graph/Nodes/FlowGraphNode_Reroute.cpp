@@ -1,10 +1,9 @@
 // Copyright https://github.com/MothCocoon/FlowGraph/graphs/contributors
-
 #include "Graph/Nodes/FlowGraphNode_Reroute.h"
 #include "SGraphNodeKnot.h"
 // #ARKREP_MODIFIED_CODE : Use our custom SFlowGraphNodeKnot
 #include "Graph/Widgets/SFlowGraphNodeKnot.h"
-// !#ARKREP_MODIFIED_CODE 
+// !#ARKREP_MODIFIED_CODE
 
 #include "Graph/FlowGraph.h"
 #include "Graph/Nodes/FlowGraphNode.h"
@@ -13,10 +12,9 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(FlowGraphNode_Reroute)
 
-UFlowGraphNode_Reroute::UFlowGraphNode_Reroute(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
+UFlowGraphNode_Reroute::UFlowGraphNode_Reroute()
 {
-	AssignedNodeClasses = { UFlowNode_Reroute::StaticClass() };
+	AssignedNodeClasses = {UFlowNode_Reroute::StaticClass()};
 }
 
 TSharedPtr<SGraphNode> UFlowGraphNode_Reroute::CreateVisualWidget()

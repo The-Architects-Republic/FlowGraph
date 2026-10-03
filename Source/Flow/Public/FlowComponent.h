@@ -229,6 +229,8 @@ public:
 // SaveGame
 
 public:
+	virtual bool CanSave() const { return true; }
+	
 	UFUNCTION(BlueprintCallable, Category = "SaveGame")
 	virtual void SaveRootFlow(TArray<FFlowAssetSaveData>& SavedFlowInstances);
 
@@ -239,7 +241,7 @@ public:
 	FFlowComponentSaveData SaveInstance();
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGame")
-	bool LoadInstance();
+	bool LoadInstance(const UFlowSubsystem* FlowSubsystem);
 
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "SaveGame")

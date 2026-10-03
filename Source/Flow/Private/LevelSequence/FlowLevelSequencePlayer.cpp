@@ -18,12 +18,12 @@ UFlowLevelSequencePlayer::UFlowLevelSequencePlayer(const FObjectInitializer& Obj
 UFlowLevelSequencePlayer* UFlowLevelSequencePlayer::CreateFlowLevelSequencePlayer(
 	const UObject* WorldContextObject,
 	ULevelSequence* LevelSequence,
-	FMovieSceneSequencePlaybackSettings Settings,
-	FLevelSequenceCameraSettings CameraSettings,
-	AActor* TransformOriginActor,
+	const FMovieSceneSequencePlaybackSettings& Settings,
+	const FLevelSequenceCameraSettings CameraSettings,
+	const AActor* TransformOriginActor,
 	const bool bReplicates,
 	const bool bAlwaysRelevant,
-	ALevelSequenceActor*& OutActor
+	TObjectPtr<AFlowLevelSequenceActor>& OutActor
 )
 {
 	if (LevelSequence == nullptr)
@@ -57,14 +57,14 @@ UFlowLevelSequencePlayer* UFlowLevelSequencePlayer::CreateFlowLevelSequencePlaye
 	Actor->SetPlaybackSettings(Settings);
 	Actor->CameraSettings = CameraSettings;
 
-	// apply Transform Origin to spawned actor
-	if (TransformOriginActor)
+	// InstanceData is not set to replicate to the clients, 
+	// so the clients will still play the level sequence using the world origin as the sequence origin.
+	// Instead of replicating the data, just assume the spawn transform of the level sequence actor is the sequence origin.
+	// The level sequence actor was either spawned at the world origin or at the transform of TransformOriginActor.
+	if (UDefaultLevelSequenceInstanceData* InstanceData = Cast<UDefaultLevelSequenceInstanceData>(Actor->DefaultInstanceData))
 	{
-		if (UDefaultLevelSequenceInstanceData* InstanceData = Cast<UDefaultLevelSequenceInstanceData>(Actor->DefaultInstanceData))
-		{
-			Actor->bOverrideInstanceData = true;
-			InstanceData->TransformOriginActor = TransformOriginActor;
-		}
+		Actor->bOverrideInstanceData = true;
+		InstanceData->TransformOriginActor = Actor;
 	}
 
 	// support networking

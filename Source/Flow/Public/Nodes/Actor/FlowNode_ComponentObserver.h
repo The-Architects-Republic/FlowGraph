@@ -50,10 +50,11 @@ protected:
 
 	TMap<TWeakObjectPtr<AActor>, TWeakObjectPtr<UFlowComponent>> RegisteredActors;
 
-protected:
+public:
 	virtual void ExecuteInput(const FName& PinName) override;
 	virtual void OnLoad_Implementation() override;
 
+protected:	
 	virtual void StartObserving();
 	virtual void StopObserving();
 
@@ -75,13 +76,14 @@ protected:
 	UFUNCTION()
 	virtual void OnEventReceived();
 
+public:	
 	virtual void Cleanup() override;
 
 #if WITH_EDITOR
-public:
 	virtual FString GetNodeDescription() const override;
-	virtual EDataValidationResult ValidateNode() override;
-
 	virtual FString GetStatusString() const override;
+	
+protected:	
+	virtual EDataValidationResult ValidateNode() override;
 #endif
 };

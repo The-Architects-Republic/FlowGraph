@@ -1,5 +1,4 @@
 // Copyright https://github.com/MothCocoon/FlowGraph/graphs/contributors
-
 #include "Nodes/FlowNodeBase.h"
 
 #include "FlowAsset.h"
@@ -16,37 +15,20 @@
 #include "Types/FlowNamedDataPinProperty.h"
 
 #include "Components/ActorComponent.h"
-#if WITH_EDITOR
-#include "Editor.h"
-#endif
-
 #include "Engine/Blueprint.h"
 #include "Engine/Engine.h"
 #include "Engine/ViewportStatsSubsystem.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
-#include "Misc/App.h"
 #include "Misc/Paths.h"
-#include "Serialization/MemoryReader.h"
-#include "Serialization/MemoryWriter.h"
+
+#if WITH_EDITOR
+#include "Editor.h"
+#endif
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(FlowNodeBase)
 
 using namespace EFlowForEachAddOnFunctionReturnValue_Classifiers;
-
-UFlowNodeBase::UFlowNodeBase()
-#if WITH_EDITORONLY_DATA
-	: GraphNode(nullptr)
-	, bDisplayNodeTitleWithoutPrefix(true)
-	, bCanDelete(true)
-	, bCanDuplicate(true)
-	, bNodeDeprecated(false)
-	, NodeDisplayStyle(FlowNodeStyle::Node)
-	, NodeStyle(EFlowNodeStyle::Invalid)
-	, NodeColor(FLinearColor::Black)
-#endif
-{
-}
 
 UWorld* UFlowNodeBase::GetWorld() const
 {
@@ -105,26 +87,6 @@ void UFlowNodeBase::DeinitializeInstance()
 	}
 
 	IFlowCoreExecutableInterface::DeinitializeInstance();
-}
-
-void UFlowNodeBase::PreloadContent()
-{
-	IFlowCoreExecutableInterface::PreloadContent();
-
-	for (UFlowNodeAddOn* AddOn : AddOns)
-	{
-		AddOn->PreloadContent();
-	}
-}
-
-void UFlowNodeBase::FlushContent()
-{
-	for (UFlowNodeAddOn* AddOn : AddOns)
-	{
-		AddOn->FlushContent();
-	}
-
-	IFlowCoreExecutableInterface::FlushContent();
 }
 
 void UFlowNodeBase::OnActivate()
@@ -641,7 +603,7 @@ FString UFlowNodeBase::GetNodeCategory() const
 		}
 	}
 
-	return Category;
+	return K2_GetNodeCategory();
 }
 
 bool UFlowNodeBase::GetDynamicTitleColor(FLinearColor& OutColor) const
@@ -654,6 +616,32 @@ bool UFlowNodeBase::GetDynamicTitleColor(FLinearColor& OutColor) const
 	}
 
 	return false;
+}
+
+FText UFlowNodeBase::GetNodeTitle() const
+{
+	if (HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject))
+	{
+		// For the archetype of the node (e.g. in the node selection UI), only use the default value
+		return UFlowNodeBase::K2_GetNodeTitle_Implementation();
+	}
+	else
+	{
+		return K2_GetNodeTitle();
+	}
+}
+
+FText UFlowNodeBase::GetNodeToolTip() const
+{
+	if (HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject))
+	{
+		// For the archetype of the node (e.g. in the node selection UI), only use the default value
+		return UFlowNodeBase::K2_GetNodeToolTip_Implementation();
+	}
+	else
+	{
+		return K2_GetNodeToolTip();
+	}
 }
 
 FText UFlowNodeBase::GetGeneratedDisplayName() const
@@ -840,6 +828,15 @@ FText UFlowNodeBase::K2_GetNodeToolTip_Implementation() const
 #endif
 }
 
+FString UFlowNodeBase::K2_GetNodeCategory_Implementation() const
+{
+#if WITH_EDITORONLY_DATA
+	return Category;
+#else
+	return "";
+#endif
+}
+
 FText UFlowNodeBase::GetNodeConfigText() const
 {
 #if WITH_EDITORONLY_DATA
@@ -865,9 +862,21 @@ void UFlowNodeBase::UpdateNodeConfigText_Implementation()
 
 void UFlowNodeBase::LogError(FString Message, const EFlowOnScreenMessageType OnScreenMessageType) const
 {
-#if !UE_BUILD_SHIPPING
+#if !NO_LOGGING || UE_ENABLE_DEBUG_DRAWING
 	if (BuildMessage(Message))
 	{
+		// Output Log
+		UE_LOG(LogFlow, Error, TEXT("%s"), *Message);
+		
+#if WITH_EDITOR
+		if (GEditor)
+		{
+			// Message Log
+			GetFlowAsset()->GetTemplateAsset()->LogError(Message, this);
+		}
+#endif
+		
+#if UE_ENABLE_DEBUG_DRAWING
 		// OnScreen Message
 		if (OnScreenMessageType == EFlowOnScreenMessageType::Permanent)
 		{
@@ -894,16 +903,6 @@ void UFlowNodeBase::LogError(FString Message, const EFlowOnScreenMessageType OnS
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, Message);
 		}
-
-		// Output Log
-		UE_LOG(LogFlow, Error, TEXT("%s"), *Message);
-
-#if WITH_EDITOR
-		if (GEditor)
-		{
-			// Message Log
-			GetFlowAsset()->GetTemplateAsset()->LogError(Message, this);
-		}
 #endif
 	}
 #endif
@@ -911,7 +910,7 @@ void UFlowNodeBase::LogError(FString Message, const EFlowOnScreenMessageType OnS
 
 void UFlowNodeBase::LogWarning(FString Message) const
 {
-#if !UE_BUILD_SHIPPING
+#if !NO_LOGGING
 	if (BuildMessage(Message))
 	{
 		// Output Log
@@ -930,7 +929,7 @@ void UFlowNodeBase::LogWarning(FString Message) const
 
 void UFlowNodeBase::LogNote(FString Message) const
 {
-#if !UE_BUILD_SHIPPING
+#if !NO_LOGGING
 	if (BuildMessage(Message))
 	{
 		// Output Log
@@ -949,7 +948,7 @@ void UFlowNodeBase::LogNote(FString Message) const
 
 void UFlowNodeBase::LogVerbose(FString Message) const
 {
-#if !UE_BUILD_SHIPPING
+#if !NO_LOGGING
 	if (BuildMessage(Message))
 	{
 		// Output Log
@@ -958,7 +957,7 @@ void UFlowNodeBase::LogVerbose(FString Message) const
 #endif
 }
 
-#if !UE_BUILD_SHIPPING
+#if !NO_LOGGING || UE_ENABLE_DEBUG_DRAWING
 bool UFlowNodeBase::BuildMessage(FString& Message) const
 {
 	const UFlowAsset* FlowAsset = GetFlowAsset();
@@ -990,6 +989,11 @@ EDataValidationResult UFlowNodeBase::ValidateNode()
 
 bool UFlowNodeBase::TryAddValueToFormatNamedArguments(const FFlowNamedDataPinProperty& NamedDataPinProperty, FFormatNamedArguments& InOutArguments) const
 {
+	if (NamedDataPinProperty.Name.IsNone() || !NamedDataPinProperty.DataPinValue.IsValid())
+	{
+		return false;
+	}
+
 	const FFlowDataPinValue& DataPinValue = NamedDataPinProperty.DataPinValue.Get();
 
 	const FFlowPinTypeName PinTypeName = DataPinValue.GetPinTypeName();

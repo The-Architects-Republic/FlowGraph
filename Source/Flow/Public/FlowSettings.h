@@ -2,9 +2,12 @@
 #pragma once
 
 #include "Engine/DeveloperSettings.h"
-#include "Templates/SubclassOf.h"
+#include "StructUtils/InstancedStruct.h"
 #include "UObject/SoftObjectPath.h"
 #include "FlowSettings.generated.h"
+
+struct FFlowPinConnectionPolicy;
+struct FFlowPreloadPolicy;
 
 /**
  * Mostly runtime settings of the Flow Graph.
@@ -14,9 +17,23 @@ class FLOW_API UFlowSettings : public UDeveloperSettings
 {
 	GENERATED_UCLASS_BODY()
 
+public:
+	/* Returns a typed pointer to the current pin connection policy, or nullptr if unset/invalid. */
+	const FFlowPinConnectionPolicy* GetPinConnectionPolicy() const;
+
+	/* Returns a typed pointer to the current preload policy, or nullptr if unset/invalid. */
+	const FFlowPreloadPolicy* GetPreloadPolicy() const;
+
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
+
+	/* The policy for connecting pins in the Flow Graph Editor. */
+	UPROPERTY(EditAnywhere, config, Category = "Default Policies", DisplayName = "Pin Connection Policy", NoClear, meta = (ExcludeBaseStruct, BaseStruct = "/Script/Flow.FlowPinConnectionPolicy"))
+	FInstancedStruct PinConnectionPolicy;
+
+	UPROPERTY(EditAnywhere, config, Category = "Default Policies", DisplayName = "Preload Policy", NoClear, meta = (ExcludeBaseStruct, BaseStruct = "/Script/Flow.FlowPreloadPolicy"))
+	FInstancedStruct PreloadPolicy;
 
 	/* If True, defer the Triggered Outputs for a FlowAsset while it is currently processing a TriggeredInput.
      * If False, use legacy behavior for backward compatability. */
@@ -40,12 +57,12 @@ class FLOW_API UFlowSettings : public UDeveloperSettings
 	 * by incorporating data that would otherwise go in the Description. */
 	UPROPERTY(EditAnywhere, config, Category = "Nodes")
 	bool bUseAdaptiveNodeTitles;
-	
+
 #if WITH_EDITOR
 	DECLARE_DELEGATE(FFlowSettingsEvent);
 	FFlowSettingsEvent OnAdaptiveNodeTitlesChanged;
 #endif
-	
+
 	/* Default class to use as a FlowAsset's "ExpectedOwnerClass". */
 	UPROPERTY(EditAnywhere, Config, Category = "Nodes")
 	FSoftClassPath DefaultExpectedOwnerClass;

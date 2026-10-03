@@ -33,11 +33,11 @@ public:
 #endif
 
 protected:
-	EFlowDataPinResolveResult TryResolveFormatText(const FName& PinName, FText& OutFormattedText) const;
+	EFlowDataPinResolveResult TryResolveFormattedText(const FName& PinName, FText& OutFormattedText) const;
 
 public:
 	// IFlowDataPinValueSupplierInterface
-	virtual FFlowDataPinResult TrySupplyDataPin(FName PinName) const override;
+	virtual FFlowDataPinResult TrySupplyDataPin(const FName PinName) const override;
 	// --
 
 	static const FName OUTPIN_TextOutput;
