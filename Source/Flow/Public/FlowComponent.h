@@ -54,10 +54,10 @@ class FLOW_API UFlowComponent : public UActorComponent, public IFlowAssetProvide
 //////////////////////////////////////////////////////////////////////////
 // Identity Tags
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_IdentityTags, Category = "Flow")
-	FGameplayTagContainer IdentityTags;
 
 public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_IdentityTags, Category = "Flow")
+	FGameplayTagContainer IdentityTags;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
